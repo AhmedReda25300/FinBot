@@ -1,0 +1,19 @@
+# Core dependencies
+numpy
+faiss-cpu
+sentence-transformers
+google-generativeai
+
+# Data handling
+pickle5>=0.0.11; python_version < "3.8"
+streamlit
+pandas
+# Optional: GPU support for FAISS (uncomment if you have CUDA)
+# faiss-gpu>=1.7.0
+
+# Optional: For better performance with large datasets
+# torch>=1.9.0
+
+# Development dependencies (uncomment if needed)
+# pytest>=6.0.0
+# jupyter>=1.0.0
