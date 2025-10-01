@@ -3,7 +3,7 @@ numpy
 faiss-cpu
 sentence-transformers
 google-generativeai
-
+python-dotenv
 # Data handling
 pickle5>=0.0.11; python_version < "3.8"
 streamlit
