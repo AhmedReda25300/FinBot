@@ -1,4 +1,3 @@
-# loader.py
 import json
 import os
 import pickle
@@ -191,25 +190,30 @@ def main():
         return
 
     # Folder paths
-    guides_folder = r"C:\Users\AReda\Desktop\finbot pro\final-data\guides"
+    # guides_folder = r"C:\Users\AReda\Desktop\finbot pro\final-data\guides"
     decisions_folder = r"C:\Users\AReda\Desktop\finbot pro\tt"
 
-    # Load and embed guides
-    print("Loading and embedding guides chunks...")
-    guides_fields = ['filename', 'title', 'clean_content']
-    guides_chunks = load_chunks(guides_folder, guides_fields, "guides")
+    # Load and embed guides (unchanged)
+    # print("Loading and embedding guides chunks...")
+    # guides_fields = ['filename', 'title', 'clean_content']
+    # guides_chunks = load_chunks(guides_folder, guides_fields, "guides")
     
-    if guides_chunks:
-        guides_texts = [chunk['text'] for chunk in guides_chunks]
-        print(f"Embedding {len(guides_texts)} guide chunks...")
-        guides_embeddings = np.vstack([get_embedding(text, api_key) for text in guides_texts])
-        create_and_save_faiss(guides_chunks, guides_embeddings, 'guides.faiss', 'guides_chunks.pkl')
-    else:
-        print("No guides chunks to process.")
+    # if guides_chunks:
+    #     guides_texts = [chunk['text'] for chunk in guides_chunks]
+    #     print(f"Embedding {len(guides_texts)} guide chunks...")
+    #     guides_embeddings = np.vstack([get_embedding(text, api_key) for text in guides_texts])
+    #     create_and_save_faiss(guides_chunks, guides_embeddings, 'guides.faiss', 'guides_chunks.pkl')
+    # else:
+    #     print("No guides chunks to process.")
 
     # Load and embed decisions (with separate embeddings for each field)
+    # Only embedding the 3 main content fields
     print("Loading and embedding decisions chunks...")
-    decisions_fields = ['اسباب القرار', 'البنود محل الاعتراض', 'منطوق القرار']
+    decisions_fields = [
+        'اسباب القرار',
+        'البنود محل الاعتراض',
+        'منطوق القرار'
+    ]
     decisions_chunks = load_decision_chunks(decisions_folder, decisions_fields, "decisions")
     
     if decisions_chunks:
