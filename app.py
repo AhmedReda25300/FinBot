@@ -173,7 +173,7 @@ def load_models_and_data():
         return None, None, None, None, None, None
     
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-pro')
     
     guides_chunks = []
     guides_index = None
