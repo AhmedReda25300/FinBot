@@ -42,14 +42,19 @@ def split_text(text, max_tokens=2048, overlap_ratio=0.1):
 
     return chunks
 
-def generate_unique_id(item, filename):
-    """Generate a unique ID for an item based on its content and filename"""
-    # Create a hash based on the item's key fields to identify unique decisions
-    identifier_fields = ['رقم القرار', 'تاريخ القرار'] if 'رقم القرار' in item else []
-    identifier_parts = [str(item.get(field, '')) for field in identifier_fields if field in item]
-    identifier_parts.append(filename)
+# def generate_unique_id(item, filename):
+#     """Generate a unique ID for an item based on its content and filename"""
+#     # Create a hash based on the item's key fields to identify unique decisions
+#     identifier_fields = ['رقم القرار', 'تاريخ القرار'] if 'رقم القرار' in item else []
+#     identifier_parts = [str(item.get(field, '')) for field in identifier_fields if field in item]
+#     identifier_parts.append(filename)
     
-    identifier_string = '|'.join(identifier_parts)
+#     identifier_string = '|'.join(identifier_parts)
+#     return hashlib.md5(identifier_string.encode('utf-8')).hexdigest()[:12]
+def generate_unique_id(item, filename):
+    """Generate a unique ID for an item based on رقم_القرار_النهائي and filename"""
+    identifier_value = str(item.get('رقم_القرار_النهائي', ''))
+    identifier_string = f"{identifier_value}|{filename}"
     return hashlib.md5(identifier_string.encode('utf-8')).hexdigest()[:12]
 
 def load_chunks(folder_path, text_fields, folder_name=""):
@@ -103,67 +108,115 @@ def load_chunks(folder_path, text_fields, folder_name=""):
     print(f"Loaded {len(chunks)} chunks from {folder_name}.")
     return chunks
 
-def load_decision_chunks(folder_path, decision_fields, folder_name=""):
-    """
-    Load JSON files from the decisions folder and create separate chunks for each decision field.
-    Each field gets its own embedding, but each chunk contains ALL the original data.
+# def load_decision_chunks(folder_path, decision_fields, folder_name=""):
+#     """
+#     Load JSON files from the decisions folder and create separate chunks for each decision field.
+#     Each field gets its own embedding, but each chunk contains ALL the original data.
     
-    decision_fields: list of keys to create separate embeddings for.
+#     decision_fields: list of keys to create separate embeddings for.
+#     """
+#     print(f"Loading decision chunks from {folder_path}")
+#     chunks = []
+#     for filename in os.listdir(folder_path):
+#         if filename.endswith('.json'):
+#             file_path = os.path.join(folder_path, filename)
+#             print(f"Processing file: {filename}")
+#             with open(file_path, 'r', encoding='utf-8') as f:
+#                 data = json.load(f)
+#                 if isinstance(data, list):
+#                     for item_idx, item in enumerate(data):
+#                         unique_id = generate_unique_id(item, filename)
+#                         # Create separate chunks for each decision field
+#                         for field in decision_fields:
+#                             if field in item:
+#                                 # The text used for embedding is ONLY this field
+#                                 embedding_text = str(item.get(field, '')).strip()
+#                                 if embedding_text:
+#                                     # Split large texts
+#                                     text_chunks = split_text(embedding_text)
+#                                     for chunk_idx, text_chunk in enumerate(text_chunks):
+#                                         chunks.append({
+#                                             'text': text_chunk,  # Only this field's text for embedding
+#                                             'metadata': item.copy(),  # Complete original data with ALL fields
+#                                             'filename': filename,
+#                                             'unique_id': unique_id,
+#                                             'embedding_source': field,  # Which field was used for embedding
+#                                             'chunk_index': chunk_idx,
+#                                             'total_chunks': len(text_chunks),
+#                                             # Unique identifier for this specific field+chunk combination
+#                                             'field_chunk_id': f"{unique_id}_{field}_{chunk_idx}"
+#                                         })
+#                 else:
+#                     unique_id = generate_unique_id(data, filename)
+#                     # Create separate chunks for each decision field
+#                     for field in decision_fields:
+#                         if field in data:
+#                             # The text used for embedding is ONLY this field
+#                             embedding_text = str(data.get(field, '')).strip()
+#                             if embedding_text:
+#                                 # Split large texts
+#                                 text_chunks = split_text(embedding_text)
+#                                 for chunk_idx, text_chunk in enumerate(text_chunks):
+#                                     chunks.append({
+#                                         'text': text_chunk,  # Only this field's text for embedding
+#                                         'metadata': data.copy(),  # Complete original data with ALL fields
+#                                         'filename': filename,
+#                                         'unique_id': unique_id,
+#                                         'embedding_source': field,  # Which field was used for embedding
+#                                         'chunk_index': chunk_idx,
+#                                         'total_chunks': len(text_chunks),
+#                                         # Unique identifier for this specific field+chunk combination
+#                                         'field_chunk_id': f"{unique_id}_{field}_{chunk_idx}"
+#                                     })
+#     print(f"Loaded {len(chunks)} decision chunks from {folder_name}.")
+#     return chunks
+def load_decision_chunks(folder_path, folder_name=""):
     """
-    print(f"Loading decision chunks from {folder_path}")
+    Load decisions and create multiple embedding entries per decision.
+    Each بند gets its own embedding, but all point to the same complete decision data.
+    """
     chunks = []
     for filename in os.listdir(folder_path):
-        if filename.endswith('.json'):
-            file_path = os.path.join(folder_path, filename)
-            print(f"Processing file: {filename}")
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    for item_idx, item in enumerate(data):
-                        unique_id = generate_unique_id(item, filename)
-                        # Create separate chunks for each decision field
-                        for field in decision_fields:
-                            if field in item:
-                                # The text used for embedding is ONLY this field
-                                embedding_text = str(item.get(field, '')).strip()
-                                if embedding_text:
-                                    # Split large texts
-                                    text_chunks = split_text(embedding_text)
-                                    for chunk_idx, text_chunk in enumerate(text_chunks):
-                                        chunks.append({
-                                            'text': text_chunk,  # Only this field's text for embedding
-                                            'metadata': item.copy(),  # Complete original data with ALL fields
-                                            'filename': filename,
-                                            'unique_id': unique_id,
-                                            'embedding_source': field,  # Which field was used for embedding
-                                            'chunk_index': chunk_idx,
-                                            'total_chunks': len(text_chunks),
-                                            # Unique identifier for this specific field+chunk combination
-                                            'field_chunk_id': f"{unique_id}_{field}_{chunk_idx}"
-                                        })
-                else:
-                    unique_id = generate_unique_id(data, filename)
-                    # Create separate chunks for each decision field
-                    for field in decision_fields:
-                        if field in data:
-                            # The text used for embedding is ONLY this field
-                            embedding_text = str(data.get(field, '')).strip()
-                            if embedding_text:
-                                # Split large texts
-                                text_chunks = split_text(embedding_text)
-                                for chunk_idx, text_chunk in enumerate(text_chunks):
-                                    chunks.append({
-                                        'text': text_chunk,  # Only this field's text for embedding
-                                        'metadata': data.copy(),  # Complete original data with ALL fields
-                                        'filename': filename,
-                                        'unique_id': unique_id,
-                                        'embedding_source': field,  # Which field was used for embedding
-                                        'chunk_index': chunk_idx,
-                                        'total_chunks': len(text_chunks),
-                                        # Unique identifier for this specific field+chunk combination
-                                        'field_chunk_id': f"{unique_id}_{field}_{chunk_idx}"
-                                    })
-    print(f"Loaded {len(chunks)} decision chunks from {folder_name}.")
+        if not filename.endswith(".json"):
+            continue
+
+        with open(os.path.join(folder_path, filename), "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        for decision in data:
+            decision_data = decision.get("تفصيل_القرار", {})
+            decision_id = decision_data.get("رقم_القرار_النهائي", "")
+            unique_id = generate_unique_id({"رقم_القرار_النهائي": decision_id}, filename)
+            
+            # Create the complete decision content (stored once)
+            complete_decision_text = json.dumps(decision, ensure_ascii=False, indent=2)
+            
+            # Create separate embedding entries for each بند
+            for بند_idx, بند in enumerate(decision_data.get("البنود_محل_الدعوى", [])):
+                # Combine the fields of each بند into one text for embedding
+                embedding_text = (
+                    f"اسم البند: {بند.get('اسم_البند', '')}\n\n"
+                    f"نبذة مختصرة عن الاعتراض: {بند.get('نبذة_مختصرة_عن_الاعتراض', '')}\n\n"
+                    f"وجهة نظر المكلف بالتفصيل: {بند.get('وجهة_نظر_المكلف_بالتفصيل', '')}\n\n"
+                    f"وجهة نظر الهيئة بالتفصيل: {بند.get('وجهة_نظر_الهيئة_بالتفصيل', '')}\n\n"
+                    f"الرأي النهائي للجنة الاستئناف ومبرراته: {بند.get('الرأي_النهائي_لجنة_الاستئناف_ومبرراته', '')}"
+                ).strip()
+
+                if embedding_text:
+                    chunks.append({
+                        'text': embedding_text,  # Text for embedding (specific بند)
+                        'metadata': decision.copy(),  # Complete decision data
+                        'filename': filename,
+                        'unique_id': unique_id,
+                        'embedding_source': f'بند_{بند_idx}',  # Which بند was used for embedding
+                        'بند_name': بند.get('اسم_البند', ''),
+                        'decision_id': decision_id,
+                        'source': folder_name,
+                        # Unique identifier for this specific embedding
+                        'embedding_id': f"{unique_id}_بند_{بند_idx}"
+                    })
+
+    print(f"Loaded {len(chunks)} embedding entries from {folder_name}.")
     return chunks
 
 def create_and_save_faiss(chunks, embeddings, index_filename, chunks_filename):
@@ -182,45 +235,74 @@ def create_and_save_faiss(chunks, embeddings, index_filename, chunks_filename):
     
     print(f"Saved FAISS index to {index_filename} and chunks to {chunks_filename}.")
 
+# def main():
+#     # Get API key
+#     api_key = os.getenv('GOOGLE_API_KEY')
+#     if not api_key:
+#         print("API key is required.")
+#         return
+
+#     # Folder paths
+#     # guides_folder = r"C:\Users\AReda\Desktop\finbot pro\final-data\guides"
+#     decisions_folder = r"C:\Users\AReda\Desktop\finbot pro\tt"
+
+#     # Load and embed guides (unchanged)
+#     # print("Loading and embedding guides chunks...")
+#     # guides_fields = ['filename', 'title', 'clean_content']
+#     # guides_chunks = load_chunks(guides_folder, guides_fields, "guides")
+    
+#     # if guides_chunks:
+#     #     guides_texts = [chunk['text'] for chunk in guides_chunks]
+#     #     print(f"Embedding {len(guides_texts)} guide chunks...")
+#     #     guides_embeddings = np.vstack([get_embedding(text, api_key) for text in guides_texts])
+#     #     create_and_save_faiss(guides_chunks, guides_embeddings, 'guides.faiss', 'guides_chunks.pkl')
+#     # else:
+#     #     print("No guides chunks to process.")
+
+#     # Load and embed decisions (with separate embeddings for each field)
+#     # Only embedding the 3 main content fields
+#     print("Loading and embedding decisions chunks...")
+#     decisions_fields = [
+#         'اسباب القرار',
+#         'البنود محل الاعتراض',
+#         'منطوق القرار',
+#         'تفصيل القرار',
+#         'تفصيل القرار.اللجنة الابتدائية',
+#         'تفصيل القرار.اللجنة النهائيه'
+#     ]
+#     decisions_chunks = load_decision_chunks(decisions_folder, decisions_fields, "decisions")
+    
+#     if decisions_chunks:
+#         decisions_texts = [chunk['text'] for chunk in decisions_chunks]
+#         print(f"Embedding {len(decisions_texts)} decision chunks...")
+#         decisions_embeddings = np.vstack([get_embedding(text, api_key) for text in decisions_texts])
+#         create_and_save_faiss(decisions_chunks, decisions_embeddings, 'decisions_new.faiss', 'decisions_chunks_new.pkl')
+#     else:
+#         print("No decisions chunks to process.")
+
+#     print("Embedding process completed!")
 def main():
-    # Get API key
     api_key = os.getenv('GOOGLE_API_KEY')
     if not api_key:
         print("API key is required.")
         return
 
-    # Folder paths
-    # guides_folder = r"C:\Users\AReda\Desktop\finbot pro\final-data\guides"
-    decisions_folder = r"C:\Users\AReda\Desktop\finbot pro\tt"
+    decisions_folder = r"C:\Users\AReda\Desktop\finbot pro\data\guides"
 
-    # Load and embed guides (unchanged)
-    # print("Loading and embedding guides chunks...")
-    # guides_fields = ['filename', 'title', 'clean_content']
-    # guides_chunks = load_chunks(guides_folder, guides_fields, "guides")
-    
-    # if guides_chunks:
-    #     guides_texts = [chunk['text'] for chunk in guides_chunks]
-    #     print(f"Embedding {len(guides_texts)} guide chunks...")
-    #     guides_embeddings = np.vstack([get_embedding(text, api_key) for text in guides_texts])
-    #     create_and_save_faiss(guides_chunks, guides_embeddings, 'guides.faiss', 'guides_chunks.pkl')
-    # else:
-    #     print("No guides chunks to process.")
-
-    # Load and embed decisions (with separate embeddings for each field)
-    # Only embedding the 3 main content fields
     print("Loading and embedding decisions chunks...")
-    decisions_fields = [
-        'اسباب القرار',
-        'البنود محل الاعتراض',
-        'منطوق القرار'
-    ]
-    decisions_chunks = load_decision_chunks(decisions_folder, decisions_fields, "decisions")
-    
+    decisions_chunks = load_decision_chunks(decisions_folder, "decisions")
+
     if decisions_chunks:
         decisions_texts = [chunk['text'] for chunk in decisions_chunks]
-        print(f"Embedding {len(decisions_texts)} decision chunks...")
+        print(f"Embedding {len(decisions_texts)} decision entries...")
+        print(f"Note: Multiple embeddings may point to the same decision")
         decisions_embeddings = np.vstack([get_embedding(text, api_key) for text in decisions_texts])
-        create_and_save_faiss(decisions_chunks, decisions_embeddings, 'decisions.faiss', 'decisions_chunks.pkl')
+        create_and_save_faiss(
+            decisions_chunks, 
+            decisions_embeddings, 
+            'decisions_new_1018.faiss', 
+            'decisions_chunks_new_1018.pkl'
+        )
     else:
         print("No decisions chunks to process.")
 

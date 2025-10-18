@@ -190,8 +190,8 @@ def load_models_and_data():
     
     # Load decisions
     try:
-        decisions_index = faiss.read_index('decisions_new.faiss')
-        with open('decisions_chunks_new.pkl', 'rb') as f:
+        decisions_index = faiss.read_index('decisions_new_1018.faiss')
+        with open('decisions_chunks_new_1018.pkl', 'rb') as f:
             decisions_chunks = pickle.load(f)
     except FileNotFoundError:
         st.warning("لم يتم العثور على فهرس القرارات أو المقاطع.")
@@ -229,33 +229,16 @@ def retrieve_chunks(query_embedding, index, chunks, top_k=12):
             
             # For decision chunks, check for duplicates based on decision number
             metadata = chunk.get('metadata', {})
-            decision_num = metadata.get('رقم القرار', None)
+            
+            # Handle new nested structure
+            decision_details = metadata.get('تفصيل_القرار', {})
+            decision_num = decision_details.get('رقم_القرار_النهائي', None)
             
             if decision_num:
                 # If this decision number was already added, skip it
                 if decision_num in seen_decisions:
                     continue
                 seen_decisions.add(decision_num)
-            
-            # Ensure all metadata fields are present in the chunk
-            if 'metadata' in chunk:
-                # List of all possible metadata fields
-                metadata_fields = [
-                    'رقم القرار',
-                    'رقم الدعوى / الاستْناف',
-                    'العام الضريبي المرتبط بالقرار',
-                    'رقم الدعوه',
-                    'تفصيل القرار',
-                    'اسباب القرار',
-                    'البنود محل الاعتراض',
-                    'منطوق القرار',
-                    'Source_Filename'
-                ]
-                
-                # Ensure all fields exist (set to empty string if missing)
-                for field in metadata_fields:
-                    if field not in chunk['metadata']:
-                        chunk['metadata'][field] = ''
             
             retrieved_chunks.append(chunk)
             
@@ -270,54 +253,81 @@ def retrieve_chunks(query_embedding, index, chunks, top_k=12):
 
 def format_decision_chunk(chunk, index):
     """Format a single decision chunk with all metadata fields"""
-    metadata = chunk.get('metadata', {})
-    source = metadata.get('Source_Filename', chunk.get('filename', 'غير محدد'))
-    embedding_source = chunk.get('embedding_source', 'غير محدد')
-    
-    # Build comprehensive context with ALL fields
-    context_parts = [f"المقطع المرجعي {index} من القرارات - الملف: {source}"]
-    
-    # Add all metadata fields with proper checks
-    if metadata.get('رقم القرار'):
-        context_parts.append(f"رقم القرار: {metadata['رقم القرار']}")
-    
-    if metadata.get('رقم الدعوى / الاستْناف'):
-        context_parts.append(f"رقم الدعوى / الاستْناف: {metadata['رقم الدعوى / الاستْناف']}")
-    
-    if metadata.get('العام الضريبي المرتبط بالقرار'):
-        context_parts.append(f"العام الضريبي المرتبط بالقرار: {metadata['العام الضريبي المرتبط بالقرار']}")
-    
-    if metadata.get('رقم الدعوه'):
-        context_parts.append(f"رقم الدعوه: {metadata['رقم الدعوه']}")
-    
-    # Add the main content fields with clear labels
-    if metadata.get('تفصيل القرار'):
-        context_parts.append(f"\nتفصيل القرار:\n{metadata['تفصيل القرار']}")
-    
-    if metadata.get('اسباب القرار'):
-        context_parts.append(f"\nاسباب القرار:\n{metadata['اسباب القرار']}")
-    
-    if metadata.get('البنود محل الاعتراض'):
-        context_parts.append(f"\nالبنود محل الاعتراض:\n{metadata['البنود محل الاعتراض']}")
-    
-    if metadata.get('منطوق القرار'):
-        context_parts.append(f"\nمنطوق القرار:\n{metadata['منطوق القرار']}")
+    try:
+        metadata = chunk.get('metadata', {})
+        source = metadata.get('Source_Filename', chunk.get('filename', 'غير محدد'))
+        embedding_source = chunk.get('embedding_source', 'غير محدد')
+        
+        # Extract decision details from nested structure
+        decision_details = metadata.get('تفصيل_القرار', {})
+        
+        # Build comprehensive context with ALL fields
+        context_parts = [f"المقطع المرجعي {index} من القرارات - الملف: {source}"]
+        
+        # Add decision header information
+        if decision_details.get('رقم_القرار_النهائي'):
+            context_parts.append(f"رقم القرار النهائي: {decision_details['رقم_القرار_النهائي']}")
+        
+        if decision_details.get('اسم_الدائرة_الابتدائية'):
+            context_parts.append(f"الدائرة الابتدائية: {decision_details['اسم_الدائرة_الابتدائية']}")
+        
+        if decision_details.get('اسم_الدائرة_النهائية'):
+            context_parts.append(f"الدائرة النهائية: {decision_details['اسم_الدائرة_النهائية']}")
+        
+        # Add items/points of dispute
+        items = decision_details.get('البنود_محل_الدعوى', [])
+        if items:
+            context_parts.append("\nالبنود محل الدعوى:")
+            for i, item in enumerate(items, 1):
+                context_parts.append(f"\n--- البند {i}: {item.get('اسم_البند', 'غير محدد')} ---")
+                
+                if item.get('نبذة_مختصرة_عن_الاعتراض'):
+                    context_parts.append(f"نبذة عن الاعتراض: {item['نبذة_مختصرة_عن_الاعتراض']}")
+                
+                if item.get('وجهة_نظر_المكلف_بالتفصيل'):
+                    context_parts.append(f"وجهة نظر المكلف: {item['وجهة_نظر_المكلف_بالتفصيل']}")
+                
+                if item.get('وجهة_نظر_الهيئة_بالتفصيل'):
+                    context_parts.append(f"وجهة نظر الهيئة: {item['وجهة_نظر_الهيئة_بالتفصيل']}")
+                
+                if item.get('الرأي_النهائي_لجنة_الاستئناف_ومبرراته'):
+                    context_parts.append(f"الرأي النهائي: {item['الرأي_النهائي_لجنة_الاستئناف_ومبرراته']}")
+        
+        # Add final summary
+        if decision_details.get('خلاصة_نهائية'):
+            context_parts.append(f"\nالخلاصة النهائية:\n{decision_details['خلاصة_نهائية']}")
 
-    context_parts.append(f"\n[تم العثور على هذا القرار من خلال البحث في: {embedding_source}، والمقطع يتضمن جميع الحقول المتاحة]")
-    
-    return '\n'.join(context_parts)
+        context_parts.append(f"\n[تم العثور على هذا القرار من خلال البحث في: {embedding_source}]")
+        
+        return '\n'.join(context_parts)
+    except Exception as e:
+        return f"[خطأ في معالجة القرار {index}: {str(e)}]"
 
 def format_guide_chunk(chunk, index):
     """Format a single guide chunk"""
-    metadata = chunk.get('metadata', {})
-    source = metadata.get('filename', chunk.get('filename', 'غير محدد'))
-    
-    context_parts = [
-        f"المقطع المرجعي {index} من الأدلة الإرشادية - الملف: {source}",
-        f"المحتوى: {chunk['text']}"
-    ]
-    
-    return '\n'.join(context_parts)
+    try:
+        metadata = chunk.get('metadata', {})
+        source = metadata.get('filename', chunk.get('filename', 'غير محدد'))
+        
+        # Get text from chunk, with fallback
+        text_content = chunk.get('text', '')
+        
+        # If text is still empty, try to get it from metadata
+        if not text_content and 'text' in metadata:
+            text_content = metadata['text']
+        
+        # If still empty, use a default message
+        if not text_content:
+            text_content = "[محتوى المقطع غير متوفر]"
+        
+        context_parts = [
+            f"المقطع المرجعي {index} من الأدلة الإرشادية - الملف: {source}",
+            f"المحتوى: {text_content}"
+        ]
+        
+        return '\n'.join(context_parts)
+    except Exception as e:
+        return f"[خطأ في معالجة الدليل {index}: {str(e)}]"
 
 def format_context(retrieved_chunks, source_type):
     """Format retrieved chunks into context string with sources."""
@@ -326,10 +336,14 @@ def format_context(retrieved_chunks, source_type):
     
     context_parts = []
     for i, chunk in enumerate(retrieved_chunks, 1):
-        if source_type == "القرارات":
-            context_parts.append(format_decision_chunk(chunk, i))
-        else:
-            context_parts.append(format_guide_chunk(chunk, i))
+        try:
+            if source_type == "القرارات":
+                context_parts.append(format_decision_chunk(chunk, i))
+            else:
+                context_parts.append(format_guide_chunk(chunk, i))
+        except Exception as e:
+            st.warning(f"خطأ في معالجة المقطع {i}: {str(e)}")
+            continue
     
     return '\n\n'.join(context_parts)
 
@@ -342,30 +356,59 @@ def display_retrieved_chunks(chunks, source_type):
     st.sidebar.subheader(f"المقاطع المسترجعة من {source_type}")
     
     for i, chunk in enumerate(chunks, 1):
-        metadata = chunk.get('metadata', {})
-        
-        if source_type == "القرارات":
-            # For decisions, show decision number and embedding source
-            decision_num = metadata.get('رقم القرار', 'غير محدد')
-            embedding_src = chunk.get('embedding_source', 'غير محدد')
-            source = metadata.get('Source_Filename', chunk.get('filename', 'غير محدد'))
-            score = chunk.get('similarity_score', 0.0)
+        try:
+            metadata = chunk.get('metadata', {})
             
-            with st.sidebar.expander(f"مقطع {i} - قرار {decision_num} (من: {embedding_src}) - درجة: {score:.3f}"):
-                # Show all metadata fields
-                st.write(f"**رقم القرار:** {metadata.get('رقم القرار', 'غير محدد')}")
-                st.write(f"**العام الضريبي:** {metadata.get('العام الضريبي المرتبط بالقرار', 'غير محدد')}")
-                st.write(f"**رقم الدعوى / الاستْناف:** {metadata.get('رقم الدعوى / الاستْناف', 'غير محدد')}")
-                st.write(f"**حقل البحث:** {embedding_src}")
-                st.write("---")
-                st.text(chunk['text'][:300] + "..." if len(chunk['text']) > 300 else chunk['text'])
-        else:
-            # For guides
-            source = metadata.get('filename', chunk.get('filename', 'غير محدد'))
-            score = chunk.get('similarity_score', 0.0)
-            
-            with st.sidebar.expander(f"مقطع {i} - {source} (درجة التشابه: {score:.3f})"):
-                st.text(chunk['text'][:300] + "..." if len(chunk['text']) > 300 else chunk['text'])
+            if source_type == "القرارات":
+                # For decisions, extract from nested structure
+                decision_details = metadata.get('تفصيل_القرار', {})
+                decision_num = decision_details.get('رقم_القرار_النهائي', 'غير محدد')
+                embedding_src = chunk.get('embedding_source', 'غير محدد')
+                source = metadata.get('Source_Filename', chunk.get('filename', 'غير محدد'))
+                score = chunk.get('similarity_score', 0.0)
+                
+                with st.sidebar.expander(f"مقطع {i} - قرار {decision_num} (من: {embedding_src}) - درجة: {score:.3f}"):
+                    # Show decision information
+                    st.write(f"**رقم القرار النهائي:** {decision_num}")
+                    
+                    if decision_details.get('اسم_الدائرة_الابتدائية'):
+                        st.write(f"**الدائرة الابتدائية:** {decision_details['اسم_الدائرة_الابتدائية']}")
+                    
+                    if decision_details.get('اسم_الدائرة_النهائية'):
+                        st.write(f"**الدائرة النهائية:** {decision_details['اسم_الدائرة_النهائية']}")
+                    
+                    st.write(f"**حقل البحث:** {embedding_src}")
+                    st.write("---")
+                    
+                    # Show text preview with safe access
+                    text_preview = chunk.get('text', '')
+                    if not text_preview:
+                        # Try to get first item summary from البنود_محل_الدعوى
+                        items = decision_details.get('البنود_محل_الدعوى', [])
+                        if items and len(items) > 0:
+                            first_item = items[0]
+                            text_preview = f"{first_item.get('اسم_البند', '')}: {first_item.get('نبذة_مختصرة_عن_الاعتراض', '')}"
+                    
+                    if text_preview:
+                        st.text(text_preview[:300] + "..." if len(text_preview) > 300 else text_preview)
+                    else:
+                        st.text("[معاينة النص غير متوفرة]")
+            else:
+                # For guides
+                source = metadata.get('filename', chunk.get('filename', 'غير محدد'))
+                score = chunk.get('similarity_score', 0.0)
+                
+                with st.sidebar.expander(f"مقطع {i} - {source} (درجة التشابه: {score:.3f})"):
+                    text_content = chunk.get('text', '')
+                    if not text_content and 'text' in metadata:
+                        text_content = metadata.get('text', '')
+                    
+                    if text_content:
+                        st.text(text_content[:300] + "..." if len(text_content) > 300 else text_content)
+                    else:
+                        st.text("[محتوى المقطع غير متوفر]")
+        except Exception as e:
+            st.sidebar.error(f"خطأ في عرض المقطع {i}: {str(e)}")
 
 def summarize_decisions_batch(decisions_batch, query, model, batch_num):
     """Summarize a batch of decisions related to the query"""
@@ -375,9 +418,15 @@ def summarize_decisions_batch(decisions_batch, query, model, batch_num):
     # Format the decisions batch
     formatted_decisions = []
     for i, chunk in enumerate(decisions_batch, 1):
-        if i == 1 or '1':
-            print('1st chunk: ', chunk)
-        formatted_decisions.append(format_decision_chunk(chunk, i))
+        try:
+            formatted_decisions.append(format_decision_chunk(chunk, i))
+        except Exception as e:
+            st.warning(f"خطأ في معالجة المقطع {i} في المجموعة {batch_num}: {str(e)}")
+            continue
+    
+    if not formatted_decisions:
+        return f"=== المجموعة {batch_num}: لم يتم العثور على قرارات صالحة ===\n"
+    
     decisions_text = '\n\n'.join(formatted_decisions)
     
     # Create summarization prompt
