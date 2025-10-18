@@ -441,7 +441,7 @@ def summarize_decisions_batch(decisions_batch, query, model, batch_num):
 
 التعليمات:
 1. استخرج فقط المعلومات المرتبطة مباشرة بالسؤال
-2. احتفظ بجميع التفاصيل المهمة (رقم القرار، أسباب القرار، البنود محل الاعتراض، منطوق القرار و تفصيل القرار)
+2. احتفظ بجميع التفاصيل المهمة (رقم القرار،البنود_محل_الدعوى,خلاصة_نهائية)
 3. إذا لم تكن هناك معلومات ذات صلة، اذكر ذلك بوضوح
 4. قدم الملخص بشكل منظم وواضح
 5. لا تضيف معلومات غير موجودة في القرارات
@@ -450,7 +450,7 @@ def summarize_decisions_batch(decisions_batch, query, model, batch_num):
     
     try:
         response = model.generate_content(summarization_prompt)
-        return f"=== نتائج المجموعة {batch_num} ===\n{response.text}\n"
+        return f"=== نتائج القرارات {batch_num} ===\n{response.text}\n"
     except Exception as e:
         return f"=== خطأ في معالجة المجموعة {batch_num} ===\n{str(e)}\n"
 
