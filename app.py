@@ -190,8 +190,8 @@ def load_models_and_data():
     
     # Load decisions
     try:
-        decisions_index = faiss.read_index('decisions_new_1024.faiss')
-        with open('decisions_chunks_new_1024.pkl', 'rb') as f:
+        decisions_index = faiss.read_index('decisions_new_1029.faiss')
+        with open('decisions_chunks_new_1029.pkl', 'rb') as f:
             decisions_chunks = pickle.load(f)
     except FileNotFoundError:
         st.warning("لم يتم العثور على فهرس القرارات أو المقاطع.")
@@ -604,7 +604,7 @@ i.ضع كل مصدر في إطار ملون تلوين الخلفية بلون 2
 الصف الأول: رقم المصدر.
 الصف الثاني: اسم المصدر.
 الصف الثالث: ملخص ما جاء في المصدر.
-الصف الأخير: رابط المصدر........."""
+"""
     # Create expandable section for prompt editing
     with st.sidebar.expander("✏️ تعديل التعليمات النظامية", expanded=False):
         custom_prompt = st.text_area(
@@ -670,7 +670,7 @@ i.ضع كل مصدر في إطار ملون تلوين الخلفية بلون 2
 الصف الأول: رقم المصدر.
 الصف الثاني: اسم المصدر.
 الصف الثالث: ملخص ما جاء في المصدر.
-الصف الأخير: رابط المصدر........."""
+"""
                 st.rerun()
     
     # Clear chat button
