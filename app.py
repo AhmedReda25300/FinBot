@@ -190,8 +190,8 @@ def load_models_and_data():
     
     # Load decisions
     try:
-        decisions_index = faiss.read_index('decisions_new_1029.faiss')
-        with open('decisions_chunks_new_1029.pkl', 'rb') as f:
+        decisions_index = faiss.read_index('decisions_new_1112.faiss')
+        with open('decisions_chunks_new_1112.pkl', 'rb') as f:
             decisions_chunks = pickle.load(f)
     except FileNotFoundError:
         st.warning("لم يتم العثور على فهرس القرارات أو المقاطع.")
