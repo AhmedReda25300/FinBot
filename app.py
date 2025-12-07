@@ -178,7 +178,7 @@ def load_models_and_data():
         "publications": ("publications_new_1112.faiss", "publications_chunks_new_1112.pkl"),
         "laws": ("laws_new_1112.faiss", "laws_chunks_new_1112.pkl"),
         "guidelines": ("guidelines_new_1112.faiss", "guidelines_chunks_new_1112.pkl"),
-        "decisions": ("decisions_new_1112.faiss", "decisions_chunks_new_1112.pkl")
+        "decisions": ("decisions_new_1207.faiss", "decisions_chunks_new_1207.pkl")
     }
     
     for doc_type, (faiss_file, pkl_file) in file_map.items():
