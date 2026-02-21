@@ -12,6 +12,7 @@ pymongo==4.6.1
 google-generativeai==0.3.2
 # OpenAI
 openai
+tiktoken
 # Utilities
 numpy==1.26.3
 python-dotenv==1.0.0

@@ -1,7 +1,7 @@
 """
 Pydantic models for request and response validation
 """
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from pydantic import BaseModel, Field
 
 
@@ -42,9 +42,12 @@ class ChatRequest(BaseModel):
     """Schema for chat/question requests"""
     question: str = Field(..., description="User question")
     category: Optional[str] = Field(None, description="Filter by category")
-    source_type: Optional[str] = Field(None, description="Filter by source type")
+    source_type: Optional[Union[str, List[str]]] = Field(
+        None, description="Filter by source type (string or list of strings)"
+    )
     num_chunks: int = Field(default=5, ge=1, le=20, description="Number of chunks to retrieve")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="LLM temperature")
+    custom_system_prompt: Optional[str] = Field(None, description="Custom system prompt for LLM")
 
 
 class ChatResponse(BaseModel):

@@ -5,27 +5,29 @@ services:
     image: mongo:7.0
     container_name: vector_store_mongodb
     restart: always
+    volumes:
+      - mongodb_data:/data/db 
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: finbot_admin
+      MONGO_INITDB_ROOT_PASSWORD: 8fJ9!kP2#vL4_xQ7
+      MONGO_INITDB_DATABASE: vector_store
     ports:
       - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    environment:
-      MONGO_INITDB_DATABASE: vector_store
 
   api:
     build: .
     container_name: vector_store_api
     restart: always
     ports:
-      - "8000:8000"
+      - "0.0.0.0:8000:8000"
     environment:
-      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_URI=mongodb://finbot_admin:8fJ9!kP2#vL4_xQ7@mongodb:27017/vector_store?authSource=admin
       - DB_NAME=vector_store
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
     depends_on:
       - mongodb
-    volumes:
-      - .:/app
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   mongodb_data:

@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Store Chat UI - Advanced</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1600px;
+            height: 90vh;
+        }
+
+        .chat-section {
+            flex: 2;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sources-section {
+            flex: 1;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .sources-header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+            color: #667eea;
+        }
+
+        .tab.active {
+            color: #667eea;
+            background: white;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* Chat Tab & Filters */
+        .filters {
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .filter-group select,
+        .filter-group input[type="number"],
+        .filter-group input[type="text"] {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+            height: 38px; /* Fixed height for alignment */
+        }
+
+        .filter-group select:focus,
+        .filter-group input:focus {
+            border-color: #667eea;
+        }
+
+        /* --- New Multi-Select Styles --- */
+        .multi-select-container {
+            position: relative;
+            width: 180px;
+            font-family: inherit;
+        }
+
+        .multi-select-trigger {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+            height: 38px;
+            user-select: none;
+        }
+
+        .multi-select-trigger:hover {
+            border-color: #667eea;
+        }
+
+        .multi-select-trigger::after {
+            content: '▼';
+            font-size: 10px;
+            color: #666;
+            margin-right: 8px;
+        }
+
+        .multi-select-options {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-top: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .multi-select-options.show {
+            display: block;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+
+        .option-item:hover {
+            background: #f0f2f5;
+        }
+
+        .option-item input[type="checkbox"] {
+            margin-left: 10px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .option-item span {
+            font-size: 13px;
+            color: #333;
+        }
+        /* --- End Multi-Select Styles --- */
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .sources-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        /* Settings Tab */
+        .settings-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .settings-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .settings-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .settings-section p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .prompt-editor {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .prompt-editor:focus {
+            border-color: #667eea;
+        }
+
+        .prompt-editor.modified {
+            border-color: #ff9800;
+            background: #fff3e0;
+        }
+
+        .settings-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .settings-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-reset {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-reset:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-export {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-export:hover {
+            background: #45a049;
+        }
+
+        .btn-import {
+            background: #2196f3;
+            color: white;
+        }
+
+        .btn-import:hover {
+            background: #0b7dda;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .status-default {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .status-modified {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-right: 4px solid #2196f3;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .warning-box {
+            background: #fff3e0;
+            border-right: 4px solid #ff9800;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .message.assistant {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 18px;
+            line-height: 1.8;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+
+        /* Markdown Styles */
+        .message.assistant .message-content h1,
+        .message.assistant .message-content h2,
+        .message.assistant .message-content h3 {
+            color: #667eea;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .message.assistant .message-content h1 {
+            font-size: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        .message.assistant .message-content h2 {
+            font-size: 18px;
+            border-right: 4px solid #667eea;
+            padding-right: 12px;
+        }
+
+        .message.assistant .message-content h3 { font-size: 16px; color: #764ba2; }
+        .message.assistant .message-content h4 { font-size: 15px; color: #555; margin-top: 12px; margin-bottom: 8px; }
+        .message.assistant .message-content ul, .message.assistant .message-content ol { margin: 10px 0; padding-right: 25px; }
+        .message.assistant .message-content li { margin: 8px 0; line-height: 1.6; }
+        .message.assistant .message-content p { margin: 10px 0; line-height: 1.8; }
+        .message.assistant .message-content strong { color: #764ba2; font-weight: 600; }
+        .message.assistant .message-content em { color: #555; font-style: italic; }
+        .message.assistant .message-content code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 13px; }
+        .message.assistant .message-content blockquote { border-right: 4px solid #f093fb; padding-right: 15px; margin: 15px 0; color: #555; font-style: italic; background: #f9f9f9; padding: 12px 15px; border-radius: 4px; }
+        .message.assistant .message-content hr { border: none; border-top: 2px dashed #dee2e6; margin: 20px 0; }
+
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin: 0 4px; }
+        .badge-primary { background: #e3f2fd; color: #1976d2; }
+        .badge-success { background: #e8f5e9; color: #388e3c; }
+        .badge-warning { background: #fff3e0; color: #f57c00; }
+        .badge-info { background: #f3e5f5; color: #7b1fa2; }
+
+        .source-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .source-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .source-score {
+            display: inline-block;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .source-text {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .source-meta {
+            font-size: 11px;
+            color: #888;
+            border-top: 1px solid #dee2e6;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #dee2e6;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-area input:focus {
+            border-color: #667eea;
+        }
+
+        .input-area button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .input-area button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .input-area button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading { display: flex; gap: 5px; padding: 10px; }
+        .loading-dot { width: 8px; height: 8px; border-radius: 50%; background: #667eea; animation: bounce 1.4s infinite ease-in-out both; }
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #999;
+            font-size: 16px;
+        }
+
+        .empty-state svg { width: 80px; height: 80px; margin-bottom: 15px; opacity: 0.3; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+        .error-message {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin: 10px 20px;
+            font-size: 14px;
+        }
+
+        .char-count { font-size: 12px; color: #888; margin-top: 5px; text-align: left; }
+        input[type="file"] { display: none; }
+        .file-input-label { padding: 10px 20px; background: #2196f3; color: white; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block; }
+        .file-input-label:hover { background: #0b7dda; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Chat Section -->
+        <div class="chat-section">
+            <div class="header">
+                💬 مساعد الضرائب الذكي
+            </div>
+            
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('chat')">
+                    💬 المحادثة
+                </div>
+                <div class="tab" onclick="switchTab('settings')">
+                    ⚙️ الإعدادات
+                </div>
+            </div>
+
+            <!-- Chat Tab Content -->
+            <div id="chatTab" class="tab-content active">
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>category</label>
+                        <select id="category">
+                            <option value="EXIS-TAX">EXIS-TAX</option>
+                            <option value="RETT">RETT</option>
+                            <option value="VAT">VAT</option>
+                            <option value="ZA-1440">ZA-1440</option>
+                            <option value="ZA-1445">ZA-1445</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label>sourceType</label>
+                        <!-- New Multi-Select Dropdown -->
+                        <div class="multi-select-container" id="sourceTypeContainer">
+                            <div class="multi-select-trigger" onclick="toggleMultiSelect()">
+                                <span id="selectedSourceText">اختر المصادر...</span>
+                            </div>
+                            <div class="multi-select-options" id="sourceOptions">
+                                <label class="option-item">
+                                    <input type="checkbox" value="Publications" checked onchange="updateSelectedText()">
+                                    <span>Publications</span>
+                                </label>
+                                <label class="option-item">
+                                    <input type="checkbox" value="Decisions" checked onchange="updateSelectedText()">
+                                    <span>Decisions</span>
+                                </label>
+                                <label class="option-item">
+                                    <input type="checkbox" value="Guidelines" checked onchange="updateSelectedText()">
+                                    <span>Guidelines</span>
+                                </label>
+                                <label class="option-item">
+                                    <input type="checkbox" value="Laws" checked onchange="updateSelectedText()">
+                                    <span>Laws</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label>عدد المصادر</label>
+                        <input type="number" id="numChunks" value="5" min="1" max="20" style="width: 80px;">
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label>الإبداعية</label>
+                        <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1" style="width: 80px;">
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label>وضع البث</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; height: 38px;">
+                            <input type="checkbox" id="streamingToggle" checked onchange="toggleStreaming()" style="width: auto;">
+                            <span id="streamingLabel">مفعّل</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="chat-messages" id="chatMessages">
+                    <div class="empty-state">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <p>ابدأ المحادثة بطرح سؤالك</p>
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <input 
+                        type="text" 
+                        id="userInput" 
+                        placeholder="اكتب سؤالك هنا..."
+                        onkeypress="if(event.key === 'Enter') sendMessage()"
+                    >
+                    <button onclick="sendMessage()" id="sendBtn">إرسال</button>
+                </div>
+            </div>
+
+            <!-- Settings Tab Content -->
+            <div id="settingsTab" class="tab-content">
+                <div class="settings-content">
+                    <div class="settings-section">
+                        <h3>
+                            📝 تخصيص التعليمات (System Prompt)
+                            <span id="promptStatus" class="status-badge status-default">النسخة الافتراضية</span>
+                        </h3>
+                        
+                        <p>
+                            يمكنك تخصيص التعليمات التي يتلقاها النموذج اللغوي لتحسين جودة الإجابات.
+                            التعليمات الافتراضية مُحسّنة للعمل مع المصادر الضريبية والزكوية.
+                        </p>
+
+                        <div class="info-box">
+                            ℹ️ <strong>ملاحظة:</strong> التعديلات ستُحفظ في متصفحك فقط ولن تؤثر على المستخدمين الآخرين. يمكنك دائماً الرجوع للنسخة الافتراضية.
+                        </div>
+
+                        <textarea 
+                            id="systemPrompt" 
+                            class="prompt-editor"
+                            placeholder="أدخل التعليمات المخصصة هنا..."
+                            oninput="markPromptAsModified()"
+                        ></textarea>
+
+                        <div class="char-count" id="charCount">0 حرف</div>
+
+                        <div class="settings-buttons">
+                            <button class="btn-save" onclick="saveCustomPrompt()">
+                                💾 حفظ التعديلات
+                            </button>
+                            <button class="btn-reset" onclick="resetToDefault()">
+                                🔄 الرجوع للافتراضي
+                            </button>
+                            <button class="btn-export" onclick="exportPrompt()">
+                                📥 تصدير
+                            </button>
+                            <label class="file-input-label">
+                                📤 استيراد
+                                <input type="file" id="importFile" accept=".txt,.json" onchange="importPrompt(event)">
+                            </label>
+                        </div>
+
+                        <div class="warning-box" style="margin-top: 20px;">
+                            ⚠️ <strong>تحذير:</strong> تأكد من صحة التعليمات قبل الحفظ. التعليمات غير الصحيحة قد تؤدي إلى إجابات غير دقيقة.
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3>💡 نصائح لكتابة تعليمات فعّالة</h3>
+                        <ul style="padding-right: 20px; color: #555; line-height: 2;">
+                            <li><strong>كن محدداً:</strong> وضّح بالضبط ما تريد من النموذج أن يفعله</li>
+                            <li><strong>استخدم أمثلة:</strong> قدم أمثلة على الإجابات المطلوبة</li>
+                            <li><strong>حدد التنسيق:</strong> وضّح كيف تريد تنسيق الإجابة</li>
+                            <li><strong>ضع قيود:</strong> حدد ما يجب وما لا يجب أن يفعله النموذج</li>
+                            <li><strong>اختبر التعديلات:</strong> جرّب التعليمات الجديدة مع أسئلة متنوعة</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sources Section -->
+        <div class="sources-section">
+            <div class="sources-header">
+                📚 المصادر المسترجعة
+            </div>
+            <div class="sources-list" id="sourcesList">
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p>لا توجد مصادر بعد</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin;
+        let chatHistory = [];
+        let useStreaming = true;
+        let customPrompt = null;
+
+        // Default system prompt
+        const DEFAULT_SYSTEM_PROMPT = `إرشادات للإجابة:
+
+1- **المطلوب**: 
+   a. استخراج المصادر التي تحتوي على إجابة على السؤال أو الحالات المشابهة لحالة السؤال والتي يمكن أن تفيد السائل في معالجة الحالة لديه.
+   b. يمكن كذلك استخراج حالات عامة مشابهه لحالة السؤال مثال (السؤال عن رفض حسم مصروف ضريبة القيمة المضافة من الربح المعدل)، ويحتوي المصدر على (محددات عدم جواز حسم مصروف الضريبة أو الزكاة)، هنا تتشابه الحالة العامة مع الحالة الخاصة فيتم الاعتماد على المصدر.
+   c. مثال آخر (السؤال عن إضافة الذمم الدائنة إلى وعاء الزكاة لحولان الحول)، ويحتوي المصدر على (إضافة المصروفات المستحقة لحولان الحول)، هنا تتشابه الحالة حيث إن الذمم الدائنة تصنف كبند متداول في القوائم المالية وكذلك المصروفات المستحقة وجميعها أضيفت لحولان الحول، فيتم الاعتماد على المصدر.
+   d. في حال تكررت صفحات مختلفة لنفس المصدر في الإجابة اجمعها جميعًا في إطار واحد بدلًا من عرضها كأكثر من مصدر، وفي حال وجود صفحات كثيرة متتابعة أشر لها كنطاق مثل (الصفحة من ... إلى ...) بدلًا من كتابة رقم كل صفحة.
+   e. قم بعرض كل قرار كمصدر منفصل.
+   f. في حال كان السؤال باللغة العربية أجب بها، أما في حال كان السؤال بلغة أخرى أجب بحسب لغة السؤال مع عدم ذكر أنها ترجمة ويجب ترجمة جميع المخرجات بما فيها أسماء العناوين الرئيسية وأسماء الملفات.
+   g. في رسالتك الافتتاحية قبل الإجابة لا تذكر أنك مساعد ذكي أو أنك بحثت في المقاطع المرجعية، بل اذكر أنك بحثت في آلاف المستندات عن السؤال ووفرت المصادر الأقرب للإجابة بحسب الترتيب المعروض.
+   h. اكتب التنويه التالي -أو ترجمه بحسب لغة السؤال- في نهاية الإجابة: "**تنويه: المصادر المعروضة تمثل نتائج بحث من مصادر خارجية وتم عرضها للمساعدة فقط في تكوين رأي في الحالة محل السؤال، ولا تعتبر رأي من إدارة (Taxuto) في الحالة المتعلقة بالسؤال.**"
+   i. في حال كان السؤال يتضمن أي طلب بخلاف البحث في المصادر (مثل محادثات شخصية، أو محادثات عامة لا تتعلق بالحالات الزكوية والضريبية، أو غيرها) قم بإظهار الرسالة التالية: "أعتذر، وظيفتي هي مساعدتك في البحث عن المصادر المتعلقة بالحالات الزكوية والضريبية، لذلك من فضلك حدد استفسارك في ذلك فقط حتى يمكنني مساعدتك".
+
+2- **المصادر**: 
+   a. تحتوي المصادر على عدد من الأدلة الإرشادية للزكاة والضريبة وكذلك عدد من قرارات اللجان الضريبية وكذلك بعض المصادر العامة الأخرى.
+   b. استخرج الإجابة فقط من المصادر دون إعطاء إجابة من خارج المصادر، مع تصحيح أي أخطاء لغوية إن وجدت.
+
+3- **تنسيق الإجابة المطلوب - مهم جداً**:
+   استخدم تنسيق Markdown التالي بدقة:
+
+   # [عنوان رئيسي مختصر]
+   
+   بحثت في آلاف المستندات ووجدت **[عدد] مصدر/مصادر** ذات صلة.
+   
+   ---
+   
+   ## 📋 نظرة عامة
+   
+   [!INFO] [ملخص سريع]
+   
+   **عدد المصادر:** {{badge-primary:[عدد] مصدر}}
+   **الموثوقية:** {{badge-success:عالية}}
+   
+   ---
+   
+   ## 📚 المصادر التفصيلية
+   
+   ### المصدر الأول: [اسم المصدر]
+   
+   **نوع المصدر:** {{badge-info:[نوع]}}
+   **التطابق:** {{badge-success:[نسبة]%}}
+   
+   #### 📄 معلومات المصدر
+   #### 📝 ملخص المحتوى
+   #### 🔗 الرابط
+   
+   ---
+   
+   **تنويه: المصادر المعروضة تمثل نتائج بحث من مصادر خارجية...**
+
+   قواعد التنسيق:
+   - # ## ### للعناوين
+   - --- للفواصل
+   - **نص** للغامق
+   - {{badge-primary:نص}} {{badge-success:نص}} {{badge-warning:نص}} {{badge-info:نص}}
+   - [!INFO] [!WARNING] [!SUCCESS] للصناديق
+   - - أو * للقوائم
+   - 📚 📋 💡 ⚠️ ✅ للرموز`;
+
+        // Load saved prompt on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSavedPrompt();
+            updateSelectedText(); // Initialize multi-select text
+            document.getElementById('userInput').focus();
+        });
+
+        /* --- Multi-Select Logic --- */
+        function toggleMultiSelect() {
+            const options = document.getElementById('sourceOptions');
+            options.classList.toggle('show');
+        }
+
+        function updateSelectedText() {
+            const checkboxes = document.querySelectorAll('#sourceOptions input[type="checkbox"]:checked');
+            const textSpan = document.getElementById('selectedSourceText');
+            const totalOptions = document.querySelectorAll('#sourceOptions input[type="checkbox"]').length;
+            
+            if (checkboxes.length === 0) {
+                textSpan.textContent = 'لم يتم تحديد مصادر';
+                textSpan.style.color = '#999';
+            } else if (checkboxes.length === totalOptions) {
+                textSpan.textContent = 'الكل';
+                textSpan.style.color = '#333';
+            } else {
+                textSpan.textContent = `${checkboxes.length} محددة`;
+                textSpan.style.color = '#333';
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const container = document.getElementById('sourceTypeContainer');
+            const options = document.getElementById('sourceOptions');
+            if (container && !container.contains(event.target)) {
+                options.classList.remove('show');
+            }
+        });
+        /* --- End Multi-Select Logic --- */
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            if (tabName === 'chat') {
+                document.getElementById('chatTab').classList.add('active');
+                document.querySelectorAll('.tab')[0].classList.add('active');
+            } else if (tabName === 'settings') {
+                document.getElementById('settingsTab').classList.add('active');
+                document.querySelectorAll('.tab')[1].classList.add('active');
+            }
+        }
+
+        // Load saved prompt from localStorage
+        function loadSavedPrompt() {
+            const saved = localStorage.getItem('customSystemPrompt');
+            const promptEditor = document.getElementById('systemPrompt');
+            
+            if (saved) {
+                customPrompt = saved;
+                promptEditor.value = saved;
+                updatePromptStatus('modified');
+            } else {
+                promptEditor.value = DEFAULT_SYSTEM_PROMPT;
+                updatePromptStatus('default');
+            }
+            
+            updateCharCount();
+        }
+
+        // Mark prompt as modified
+        function markPromptAsModified() {
+            const promptEditor = document.getElementById('systemPrompt');
+            const currentValue = promptEditor.value;
+            
+            if (currentValue !== DEFAULT_SYSTEM_PROMPT && currentValue.trim() !== '') {
+                promptEditor.classList.add('modified');
+            } else {
+                promptEditor.classList.remove('modified');
+            }
+            
+            updateCharCount();
+        }
+
+        // Update character count
+        function updateCharCount() {
+            const promptEditor = document.getElementById('systemPrompt');
+            const charCount = document.getElementById('charCount');
+            const length = promptEditor.value.length;
+            charCount.textContent = `${length.toLocaleString()} حرف`;
+        }
+
+        // Update prompt status badge
+        function updatePromptStatus(status) {
+            const statusBadge = document.getElementById('promptStatus');
+            
+            if (status === 'default') {
+                statusBadge.className = 'status-badge status-default';
+                statusBadge.textContent = 'النسخة الافتراضية';
+            } else {
+                statusBadge.className = 'status-badge status-modified';
+                statusBadge.textContent = 'نسخة معدّلة';
+            }
+        }
+
+        // Save custom prompt
+        function saveCustomPrompt() {
+            const promptEditor = document.getElementById('systemPrompt');
+            const value = promptEditor.value.trim();
+            
+            if (!value) {
+                alert('لا يمكن حفظ تعليمات فارغة');
+                return;
+            }
+            
+            localStorage.setItem('customSystemPrompt', value);
+            customPrompt = value;
+            promptEditor.classList.remove('modified');
+            updatePromptStatus('modified');
+            
+            alert('✅ تم حفظ التعديلات بنجاح!');
+        }
+
+        // Reset to default prompt
+        function resetToDefault() {
+            if (confirm('هل أنت متأكد من الرجوع للتعليمات الافتراضية؟ سيتم فقدان التعديلات الحالية.')) {
+                localStorage.removeItem('customSystemPrompt');
+                customPrompt = null;
+                
+                const promptEditor = document.getElementById('systemPrompt');
+                promptEditor.value = DEFAULT_SYSTEM_PROMPT;
+                promptEditor.classList.remove('modified');
+                
+                updatePromptStatus('default');
+                updateCharCount();
+                
+                alert('✅ تم الرجوع للتعليمات الافتراضية');
+            }
+        }
+
+        // Export prompt
+        function exportPrompt() {
+            const promptEditor = document.getElementById('systemPrompt');
+            const content = promptEditor.value;
+            
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `system-prompt-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Import prompt
+        function importPrompt(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                document.getElementById('systemPrompt').value = content;
+                markPromptAsModified();
+                alert('✅ تم استيراد التعليمات بنجاح! لا تنسى الضغط على "حفظ التعديلات"');
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function getCurrentSystemPrompt() {
+            return customPrompt || DEFAULT_SYSTEM_PROMPT;
+        }
+
+        // Markdown parser
+        function parseMarkdown(text) {
+            let html = text;
+            
+            html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+            html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+            html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+            html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+            html = html.replace(/^---$/gim, '<hr>');
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            html = html.replace(/`(.*?)`/g, '<code>$1</code>');
+            html = html.replace(/\[!INFO\](.*?)(?=\n|$)/gi, '<div class="info-box">ℹ️ $1</div>');
+            html = html.replace(/\[!WARNING\](.*?)(?=\n|$)/gi, '<div class="warning-box">⚠️ $1</div>');
+            html = html.replace(/\[!SUCCESS\](.*?)(?=\n|$)/gi, '<div class="success-box">✓ $1</div>');
+            html = html.replace(/\{\{badge-primary:(.*?)\}\}/g, '<span class="badge badge-primary">$1</span>');
+            html = html.replace(/\{\{badge-success:(.*?)\}\}/g, '<span class="badge badge-success">$1</span>');
+            html = html.replace(/\{\{badge-warning:(.*?)\}\}/g, '<span class="badge badge-warning">$1</span>');
+            html = html.replace(/\{\{badge-info:(.*?)\}\}/g, '<span class="badge badge-info">$1</span>');
+            
+            const lines = html.split('\n');
+            let inList = false;
+            let processedLines = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
+                
+                if (line.match(/^[\-\*] /)) {
+                    if (!inList) {
+                        processedLines.push('<ul>');
+                        inList = true;
+                    }
+                    processedLines.push('<li>' + line.replace(/^[\-\*] /, '') + '</li>');
+                    
+                    if (!nextLine.match(/^[\-\*] /)) {
+                        processedLines.push('</ul>');
+                        inList = false;
+                    }
+                } else if (line.match(/^\d+\. /)) {
+                    if (!inList) {
+                        processedLines.push('<ol>');
+                        inList = true;
+                    }
+                    processedLines.push('<li>' + line.replace(/^\d+\. /, '') + '</li>');
+                    
+                    if (!nextLine.match(/^\d+\. /)) {
+                        processedLines.push('</ol>');
+                        inList = false;
+                    }
+                } else {
+                    processedLines.push(line);
+                }
+            }
+            
+            html = processedLines.join('\n');
+            html = html.replace(/^(?!<[h|u|o|d|l|p|b])(.*?)$/gim, '<p>$1</p>');
+            html = html.replace(/<p><\/p>/g, '');
+            html = html.replace(/<p>\s*<\/p>/g, '');
+            
+            return html;
+        }
+
+        function addMessage(role, content, isStreaming = false) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const emptyState = messagesDiv.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            if (isStreaming && role === 'assistant') {
+                const existingMessage = document.getElementById('streamingMessage');
+                if (existingMessage) {
+                    const contentDiv = existingMessage.querySelector('.message-content');
+                    contentDiv.innerHTML = parseMarkdown(content);
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                    return;
+                }
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            if (isStreaming && role === 'assistant') {
+                messageDiv.id = 'streamingMessage';
+            }
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (role === 'assistant') {
+                contentDiv.innerHTML = parseMarkdown(content);
+            } else {
+                contentDiv.textContent = content;
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            if (!isStreaming) {
+                chatHistory.push({ role, content });
+            }
+        }
+
+        function finalizeStreamingMessage() {
+            const streamingMessage = document.getElementById('streamingMessage');
+            if (streamingMessage) {
+                streamingMessage.removeAttribute('id');
+                const content = streamingMessage.querySelector('.message-content').textContent;
+                chatHistory.push({ role: 'assistant', content });
+            }
+        }
+
+        function showLoading() {
+            const messagesDiv = document.getElementById('chatMessages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant';
+            loadingDiv.id = 'loadingMessage';
+            
+            const loadingContent = document.createElement('div');
+            loadingContent.className = 'message-content';
+            
+            const loadingDots = document.createElement('div');
+            loadingDots.className = 'loading';
+            loadingDots.innerHTML = '<div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div>';
+            
+            loadingContent.appendChild(loadingDots);
+            loadingDiv.appendChild(loadingContent);
+            messagesDiv.appendChild(loadingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function removeLoading() {
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage) {
+                loadingMessage.remove();
+            }
+        }
+
+        function showError(message) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = `خطأ: ${message}`;
+            messagesDiv.appendChild(errorDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function displaySources(sources) {
+            const sourcesList = document.getElementById('sourcesList');
+            const emptyState = sourcesList.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            sourcesList.innerHTML = '';
+
+            if (!sources || sources.length === 0) {
+                sourcesList.innerHTML = '<div class="empty-state"><p>لا توجد مصادر</p></div>';
+                return;
+            }
+
+            sources.forEach((source, index) => {
+                const sourceCard = document.createElement('div');
+                sourceCard.className = 'source-card';
+                
+                const scoreSpan = document.createElement('span');
+                scoreSpan.className = 'source-score';
+                scoreSpan.textContent = `التطابق: ${(source.score * 100).toFixed(1)}%`;
+                
+                const textDiv = document.createElement('div');
+                textDiv.className = 'source-text';
+                textDiv.textContent = source.text;
+                
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'source-meta';
+                
+                const metadata = source.metadata;
+                let metaInfo = [];
+                
+                if (metadata.document_title) metaInfo.push(`📄 ${metadata.document_title}`);
+                if (metadata.decision_id) metaInfo.push(`📋 قرار: ${metadata.decision_id}`);
+                if (metadata.بند_name) metaInfo.push(`📌 ${metadata.بند_name}`);
+                if (metadata.category) metaInfo.push(`🏷️ ${metadata.category}`);
+                if (metadata.source_type) metaInfo.push(`📁 ${metadata.source_type}`);
+                
+                metaDiv.innerHTML = metaInfo.join('<br>');
+                
+                sourceCard.appendChild(scoreSpan);
+                sourceCard.appendChild(textDiv);
+                sourceCard.appendChild(metaDiv);
+                sourcesList.appendChild(sourceCard);
+            });
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const question = input.value.trim();
+            
+            if (!question) return;
+
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            input.disabled = true;
+
+            addMessage('user', question);
+            input.value = '';
+
+            showLoading();
+
+            const category = document.getElementById('category').value;
+            
+            // Get selected sources from the multi-select checkboxes
+            const selectedSources = Array.from(
+                document.querySelectorAll('#sourceOptions input[type="checkbox"]:checked')
+            ).map(cb => cb.value);
+
+            const numChunks = parseInt(document.getElementById('numChunks').value);
+            const temperature = parseFloat(document.getElementById('temperature').value);
+
+            const requestBody = {
+                question: question,
+                num_chunks: numChunks,
+                temperature: temperature
+            };
+
+            if (category) requestBody.category = category;
+            // Send source_type as an array if items are selected
+            if (selectedSources.length > 0) requestBody.source_type = selectedSources;
+
+            const currentPrompt = getCurrentSystemPrompt();
+            if (currentPrompt !== DEFAULT_SYSTEM_PROMPT) {
+                requestBody.custom_system_prompt = currentPrompt;
+            }
+
+            try {
+                if (useStreaming) {
+                    await sendStreamingRequest(requestBody);
+                } else {
+                    await sendRegularRequest(requestBody);
+                }
+            } catch (error) {
+                removeLoading();
+                console.error('Error:', error);
+                showError('حدث خطأ في الاتصال بالخادم. تأكد من تشغيل API على المنفذ 8000');
+            } finally {
+                sendBtn.disabled = false;
+                input.disabled = false;
+                input.focus();
+            }
+        }
+
+        async function sendRegularRequest(requestBody) {
+            const response = await fetch(`${API_BASE_URL}/chat/ask`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            removeLoading();
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            const data = await response.json();
+            addMessage('assistant', data.answer);
+            displaySources(data.sources);
+        }
+
+        async function sendStreamingRequest(requestBody) {
+            const response = await fetch(`${API_BASE_URL}/chat/ask_stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            removeLoading();
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullAnswer = '';
+
+            addMessage('assistant', '', true);
+
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop(); 
+
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine.startsWith('data: ')) {
+                        const jsonStr = trimmedLine.substring(6);
+                        
+                        try {
+                            const data = JSON.parse(jsonStr);
+                            
+                            if (data.type === 'sources') {
+                                displaySources(data.content);
+                            } else if (data.type === 'answer') {
+                                fullAnswer += data.content;
+                                addMessage('assistant', fullAnswer, true);
+                            } else if (data.type === 'done') {
+                                finalizeStreamingMessage();
+                            } else if (data.type === 'error') {
+                                showError(data.content);
+                            }
+                        } catch (e) {
+                            console.error("Error parsing SSE JSON:", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        function toggleStreaming() {
+            const toggle = document.getElementById('streamingToggle');
+            const label = document.getElementById('streamingLabel');
+            useStreaming = toggle.checked;
+            label.textContent = useStreaming ? 'مفعّل' : 'معطّل';
+        }
+    </script>
+</body>
+</html>
