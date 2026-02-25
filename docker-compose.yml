@@ -5,11 +5,14 @@ services:
     image: mongo:7.0
     container_name: vector_store_mongodb
     restart: always
+    # FIX 1: Force MongoDB to listen on all interfaces so the API can reach it
+    command: ["mongod", "--bind_ip_all", "--auth"]
     volumes:
       - mongodb_data:/data/db 
     environment:
       MONGO_INITDB_ROOT_USERNAME: finbot_admin
-      MONGO_INITDB_ROOT_PASSWORD: 8fJ9!kP2#vL4_xQ7
+      # FIX 2: Use single quotes for the raw password (no URL encoding here)
+      MONGO_INITDB_ROOT_PASSWORD: '8fJ9!kP2#vL4_xQ7'
       MONGO_INITDB_DATABASE: vector_store
     ports:
       - "27017:27017"
@@ -21,7 +24,9 @@ services:
     ports:
       - "0.0.0.0:8000:8000"
     environment:
-      - MONGO_URI=mongodb://finbot_admin:8fJ9!kP2#vL4_xQ7@mongodb:27017/vector_store?authSource=admin
+      # FIX 3: Keep URL encoded password here (%23 instead of #)
+      # IF RUNNING INSIDE DOCKER use: mongodb
+      - MONGO_URI=mongodb://finbot_admin:8fJ9%21kP2%23vL4_xQ7@mongodb:27017/vector_store?authSource=admin
       - DB_NAME=vector_store
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
     depends_on:

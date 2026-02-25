@@ -1,10 +1,7 @@
-"""
-LLM service for question answering using retrieved context
-Enhanced with structured formatting for better UI presentation
-"""
 from openai import AsyncOpenAI
 from typing import List, Dict, Any, AsyncIterator
 from app.config import get_settings
+import json
 
 settings = get_settings()
 
@@ -12,7 +9,6 @@ settings = get_settings()
 client = None
 if settings.OPENAI_API_KEY:
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-
 
 class LLMService:
     """Service for generating answers using OpenAI's GPT-4 model"""
@@ -29,31 +25,15 @@ class LLMService:
         context_chunks: List[Dict[str, Any]],
         temperature: float = 0.7
     ) -> str:
-        """
-        Generate an answer using the LLM with retrieved context.
-        
-        Args:
-            question: User's question
-            context_chunks: Retrieved context chunks with metadata
-            temperature: LLM temperature for response generation
-            
-        Returns:
-            Generated answer as string
-        """
-        # Build context from chunks
         context = self._build_context(context_chunks)
-        
-        # Create messages
         messages = self._create_messages(question, context)
         
-        # Generate response
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
             temperature=temperature,
             max_tokens=4096,
         )
-        
         return response.choices[0].message.content
 
     async def generate_answer_stream(
@@ -62,24 +42,9 @@ class LLMService:
         context_chunks: List[Dict[str, Any]],
         temperature: float = 0.7
     ) -> AsyncIterator[str]:
-        """
-        Generate a streaming answer using the LLM with retrieved context.
-        
-        Args:
-            question: User's question
-            context_chunks: Retrieved context chunks with metadata
-            temperature: LLM temperature for response generation
-            
-        Yields:
-            Chunks of the generated answer
-        """
-        # Build context from chunks
         context = self._build_context(context_chunks)
-        
-        # Create messages
         messages = self._create_messages(question, context)
         
-        # Generate streaming response
         stream = await self.client.chat.completions.create(
             model=self.model_name,
             messages=messages,
@@ -94,244 +59,183 @@ class LLMService:
     
     def _build_context(self, chunks: List[Dict[str, Any]]) -> str:
         """
-        Build context string from retrieved chunks.
-        
-        Args:
-            chunks: List of chunks with text and metadata
-            
-        Returns:
-            Formatted context string
+        Builds context focusing on 'chunk_title' and conditional 'page_number'.
         """
-        context_parts = []
-        
-        for idx, chunk in enumerate(chunks, 1):
-            text = chunk.get('text', '')
+        source_type_mapping = {
+            "Laws": "نظام / لائحة",
+            "Decisions": "قرار لجنة فصل",
+            "Guidelines": "دليل إرشادي",
+            "Publications": "منشورات",
+            "Regulations": "لوائح"
+        }
+
+        grouped_docs = {}
+
+        for chunk in chunks:
             metadata = chunk.get('metadata', {})
             score = chunk.get('score', 0)
             
-            # Format based on source type
-            source_type = metadata.get('source_type', '')
+            raw_source_type = metadata.get('source_type', 'Unknown')
+            display_source_type = source_type_mapping.get(raw_source_type, raw_source_type)
             
-            if 'decision' in source_type.lower():
-                # Decision document
-                decision_id = metadata.get('decision_id', 'Unknown')
-                بند_name = metadata.get('بند_name', '')
-                decision_data = metadata.get('decision_data', {})
+            # --- 1. Identify Document & Keys ---
+            doc_key = ""
+            doc_title = ""
+            excerpt_text = ""
+            section_title = ""
+            
+            # Logic to find page number (if exists)
+            page_val = metadata.get('page_number') or metadata.get('page')
+            page_info = str(page_val) if page_val else None  # set to None if missing
+
+            # --- 2. Handle Decisions vs Standard Docs ---
+            if raw_source_type == 'Decisions' or 'تفصيل_القرار' in metadata:
+                # Decision Logic
+                decision_details = metadata.get('تفصيل_القرار', {})
+                decision_id = decision_details.get('رقم_القرار_النهائي', metadata.get('Source_Filename', 'Unknown'))
                 
-                دائرة_ابتدائية = decision_data.get('اسم_الدائرة_الابتدائية', '')
-                دائرة_نهائية = decision_data.get('اسم_الدائرة_النهائية', '')
-                قرار_ابتدائي = decision_data.get('اللجنة_الابتدائية', '')
-                قرار_نهائي = decision_data.get('اللجنة_النهائية', '')
+                doc_title = f"قرار رقم: {decision_id}"
+                doc_key = f"DEC_{decision_id}"
                 
-                context_part = f"""
-[مصدر {idx} - قرار]
-نوع المصدر: قرار لجنة ضريبية
-رقم القرار: {decision_id}
-اسم الدائرة الابتدائية: {دائرة_ابتدائية}
-اسم الدائرة النهائية: {دائرة_نهائية}
-البند: {بند_name}
-درجة التطابق: {score:.2%}
+                # Handle Dispute Items as the "Text"
+                dispute_items = decision_details.get('البنود_محل_الدعوى', [])
+                if dispute_items:
+                    items_text = []
+                    for item in dispute_items:
+                        items_text.append(
+                            f"- بند النزاع: {item.get('اسم_البند', '')}\n"
+                            f"- الملخص: {item.get('نبذة_مختصرة_عن_الاعتراض', '')}\n"
+                            f"- حكم اللجنة النهائية: {item.get('رأي_اللجنة_النهائية_ومبرراته', '')}"
+                        )
+                    excerpt_text = "\n".join(items_text)
+                    section_title = "البنود محل الدعوى"
+                else:
+                    excerpt_text = chunk.get('text', chunk.get('content', ''))
+                    section_title = metadata.get('chunk_title', 'نص القرار')
 
-تفاصيل البند:
-{text}
-
-قرار اللجنة الابتدائية:
-{قرار_ابتدائي}
-
-قرار اللجنة النهائية:
-{قرار_نهائي}
-"""
             else:
-                # Guideline document
-                doc_title = metadata.get('document_title', 'Unknown')
-                chunk_title = metadata.get('chunk_title', '')
-                chunk_index = metadata.get('chunk_index', 0)
+                # Standard Document Logic (Guidelines/Laws) - MATCHING YOUR JSON
+                doc_title = metadata.get('document_title', metadata.get('Source_Filename', 'Unknown Document'))
+                doc_key = f"DOC_{doc_title}"
                 
-                # Try to extract page number from chunk_title or use chunk_index
-                page_info = f"الصفحة {chunk_index + 1}" if chunk_index is not None else ""
-                
-                context_part = f"""
-[مصدر {idx} - دليل إرشادي]
-نوع المصدر: دليل إرشادي
-اسم المصدر: {doc_title}
-القسم: {chunk_title}
-{page_info}
-درجة التطابق: {score:.2%}
+                # Extract the chunk title explicitly
+                section_title = metadata.get('chunk_title', 'نص عام')
+                excerpt_text = chunk.get('content', chunk.get('text', ''))
 
-المحتوى:
-{text}
-"""
+            # --- 3. Grouping ---
+            if doc_key not in grouped_docs:
+                grouped_docs[doc_key] = {
+                    "title": doc_title,
+                    "type": display_source_type,
+                    "max_score": score,
+                    "excerpts": []
+                }
             
+            if score > grouped_docs[doc_key]["max_score"]:
+                grouped_docs[doc_key]["max_score"] = score
+
+            # Add explicit metadata to the excerpt list
+            grouped_docs[doc_key]["excerpts"].append({
+                "section": section_title,
+                "text": excerpt_text,
+                "page": page_info  # Passes None if not found
+            })
+
+        # --- 4. Format String for LLM ---
+        context_parts = []
+        sorted_docs = sorted(grouped_docs.values(), key=lambda x: x['max_score'], reverse=True)
+
+        for idx, doc in enumerate(sorted_docs, 1):
+            excerpts_str = ""
+            for i, exc in enumerate(doc['excerpts'], 1):
+                
+                # Handle Page Display in Context
+                if exc['page']:
+                    page_display = f"رقم الصفحة: {exc['page']}"
+                else:
+                    page_display = "رقم الصفحة: غير متوفر"
+
+                # Construct the block
+                excerpts_str += f"""
+                >>> اقتباس رقم {i}:
+                - عنوان الفقرة (Chunk Title): {exc['section']}
+                - {page_display}
+                - النص:
+                {exc['text']}
+                --------------------------------------------------
+                """
+
+            context_part = f"""
+            [الملف رقم {idx}]
+            نوع الملف: {doc['type']}
+            اسم الملف: {doc['title']}
+            
+            النصوص المقتبسة:
+            {excerpts_str}
+            """
             context_parts.append(context_part)
         
-        return "\n" + "="*80 + "\n".join(context_parts)
+        return "\n==================================================\n".join(context_parts)
     
     def _create_messages(self, question: str, context: str) -> List[Dict[str, str]]:
         """
-        Create the messages for the LLM with enhanced formatting instructions.
-        
-        Args:
-            question: User's question
-            context: Retrieved context
-            
-        Returns:
-            List of message dictionaries
+        System Prompt updated to handle conditional page numbers.
         """
-        system_prompt = """إرشادات للإجابة:
+        system_prompt = """
+أنت مساعد قانوني ذكي متخصص في الأنظمة الضريبية السعودية.
 
-1- **المطلوب**: 
-   a. استخراج المصادر التي تحتوي على إجابة على السؤال أو الحالات المشابهة لحالة السؤال والتي يمكن أن تفيد السائل في معالجة الحالة لديه.
-   b. يمكن كذلك استخراج حالات عامة مشابهه لحالة السؤال مثال (السؤال عن رفض حسم مصروف ضريبة القيمة المضافة من الربح المعدل)، ويحتوي المصدر على (محددات عدم جواز حسم مصروف الضريبة أو الزكاة)، هنا تتشابه الحالة العامة مع الحالة الخاصة فيتم الاعتماد على المصدر.
-   c. مثال آخر (السؤال عن إضافة الذمم الدائنة إلى وعاء الزكاة لحولان الحول)، ويحتوي المصدر على (إضافة المصروفات المستحقة لحولان الحول)، هنا تتشابه الحالة حيث إن الذمم الدائنة تصنف كبند متداول في القوائم المالية وكذلك المصروفات المستحقة وجميعها أضيفت لحولان الحول، فيتم الاعتماد على المصدر.
-   d. في حال تكررت صفحات مختلفة لنفس المصدر في الإجابة اجمعها جميعًا في إطار واحد بدلًا من عرضها كأكثر من مصدر، وفي حال وجود صفحات كثيرة متتابعة أشر لها كنطاق مثل (الصفحة من ... إلى ...) بدلًا من كتابة رقم كل صفحة.
-   e. قم بعرض كل قرار كمصدر منفصل.
-   f. في حال كان السؤال باللغة العربية أجب بها، أما في حال كان السؤال بلغة أخرى أجب بحسب لغة السؤال مع عدم ذكر أنها ترجمة ويجب ترجمة جميع المخرجات بما فيها أسماء العناوين الرئيسية وأسماء الملفات.
-   g. في رسالتك الافتتاحية قبل الإجابة لا تذكر أنك مساعد ذكي أو أنك بحثت في المقاطع المرجعية، بل اذكر أنك بحثت في آلاف المستندات عن السؤال ووفرت المصادر الأقرب للإجابة بحسب الترتيب المعروض.
-   h. اكتب التنويه التالي -أو ترجمه بحسب لغة السؤال- في نهاية الإجابة: "**تنويه: المصادر المعروضة تمثل نتائج بحث من مصادر خارجية وتم عرضها للمساعدة فقط في تكوين رأي في الحالة محل السؤال، ولا تعتبر رأي من إدارة (Taxuto) في الحالة المتعلقة بالسؤال.**"
-   i. في حال كان السؤال يتضمن أي طلب بخلاف البحث في المصادر (مثل محادثات شخصية، أو محادثات عامة لا تتعلق بالحالات الزكوية والضريبية، أو غيرها) قم بإظهار الرسالة التالية: "أعتذر، وظيفتي هي مساعدتك في البحث عن المصادر المتعلقة بالحالات الزكوية والضريبية، لذلك من فضلك حدد استفسارك في ذلك فقط حتى يمكنني مساعدتك".
+إرشادات صارمة للإجابة:
+1. **الاعتماد على المصادر**: أجب بناءً فقط على المعلومات الواردة في "المصادر المتاحة".
 
-2- **المصادر**: 
-   a. تحتوي المصادر على عدد من الأدلة الإرشادية للزكاة والضريبة وكذلك عدد من قرارات اللجان الضريبية وكذلك بعض المصادر العامة الأخرى.
-   b. استخرج الإجابة فقط من المصادر دون إعطاء إجابة من خارج المصادر، مع تصحيح أي أخطاء لغوية إن وجدت.
+2. **التوثيق الدقيق (Citations)**:
+   - يجب ذكر **عنوان الفقرة (Chunk Title)** دائماً عند الاقتباس.
+   - **رقم الصفحة**: إذا كان "رقم الصفحة" متوفراً في المصدر، يجب ذكره (مثال: ص 5). **أما إذا كان غير متوفر، فلا تذكره نهائياً ولا تكتب "غير معروف"**.
 
-3- **تنسيق الإجابة المطلوب - مهم جداً**:
-   استخدم تنسيق Markdown التالي بدقة لضمان عرض جميل ومنظم:
+3. **تنسيق الإجابة (Markdown)**:
 
-   **هيكل الإجابة:**
-
-   # [عنوان رئيسي مختصر للموضوع]
-   
-   بحثت في آلاف المستندات عن [موضوع السؤال] ووجدت **[عدد] مصدر/مصادر** ذات صلة مباشرة.
+   # [عنوان الإجابة]
    
    ---
    
-   ## 📋 نظرة عامة
-   
-   [!INFO] [ملخص سريع للموضوع في 1-2 جملة]
-   
-   **عدد المصادر:** {{badge-primary:[عدد] مصدر}}
-   **الموثوقية:** {{badge-success:عالية}}
+   ## 📋 الملخص التنفيذي
+   [إجابة مباشرة]
    
    ---
    
-   ## 📚 المصادر التفصيلية
+   ## 📚 التفاصيل من المصادر
    
-   ### المصدر الأول: [اسم المصدر]
+   ### 1. [اسم الملف]
+   **النوع:** [نوع الملف]
    
-   **نوع المصدر:** {{badge-info:[نوع المصدر]}}
-   **التطابق:** {{badge-success:[نسبة]%}}
+   #### 📄 المحتوى ذو الصلة:
+   [شرح المحتوى...]
    
-   #### 📄 معلومات المصدر:
-   - **الاسم الكامل:** [اسم المصدر حسب النوع]
-   - **الصفحة/القرار:** [رقم الصفحة أو رقم القرار]
-   
-   #### 📝 ملخص المحتوى:
-   
-   [للأدلة الإرشادية:]
-   شرح مبسط ومنظم لمحتوى المصدر مع توضيح العلاقة بالسؤال
-   
-   [للقرارات:]
-   
-   **تلخيص حالة الدعوى:**
-   شرح مبسط للاعتراض والموضوع
-   
-   **قرار اللجنة الابتدائية:**
-   شرح واضح للقرار الابتدائي
-   
-   **قرار اللجنة النهائية:**
-   شرح واضح للقرار النهائي
-   
-   #### 🔗 الرابط:
-   [الرابط إن وجد، أو "غير متوفر"]
+   📍 **موقع المعلومة:**
+   - **عنوان الفقرة:** [اكتب عنوان الفقرة هنا]
+   - **رقم الصفحة:** [اكتب الرقم فقط إذا وُجد، وإلا احذف هذا السطر]
    
    ---
    
-   ### المصدر الثاني: [...]
-   
-   [نفس التنسيق]
-   
-   ---
-   
-   ## 💡 النقاط الرئيسية
-   
-   - **النقطة الأولى:** [شرح مختصر]
-   - **النقطة الثانية:** [شرح مختصر]
-   - **النقطة الثالثة:** [شرح مختصر]
+   ### 2. [اسم الملف الثاني...]
+   ...
    
    ---
    
-   ## ⚠️ ملاحظات هامة
-   
-   [!WARNING] [أي تحذيرات أو ملاحظات مهمة إن وجدت]
-   
-   ---
-   
-   **تنويه: المصادر المعروضة تمثل نتائج بحث من مصادر خارجية وتم عرضها للمساعدة فقط في تكوين رأي في الحالة محل السؤال، ولا تعتبر رأي من إدارة (Taxuto) في الحالة المتعلقة بالسؤال.**
-
-   **قواعد التنسيق المهمة:**
-   - استخدم # للعناوين الرئيسية
-   - استخدم ## للعناوين الفرعية
-   - استخدم ### للعناوين الأصغر
-   - استخدم --- للفواصل بين الأقسام
-   - استخدم **نص** للنص الغامق
-   - استخدم *نص* للنص المائل
-   - استخدم {{badge-primary:نص}} للشارات الزرقاء
-   - استخدم {{badge-success:نص}} للشارات الخضراء
-   - استخدم {{badge-warning:نص}} للشارات البرتقالية
-   - استخدم {{badge-info:نص}} للشارات البنفسجية
-   - استخدم [!INFO] للصناديق الزرقاء
-   - استخدم [!WARNING] للصناديق البرتقالية
-   - استخدم [!SUCCESS] للصناديق الخضراء
-   - استخدم - أو * للقوائم غير المرقمة
-   - استخدم 1. 2. 3. للقوائم المرقمة
-   - استخدم الرموز التعبيرية (📚 📋 💡 ⚠️ ✅ 📄 📝 🔗) لجعل العرض أكثر وضوحاً
-
-4- **ترتيب المصادر**:
-   a. استعرض المصادر الخاصة بالأدلة أولًا ورتبها بالأقرب للحالة.
-   b. ثم بعد ذلك المصادر الخاصة بالقرارات ورتبها كذلك بالأقرب للحالة.
-   c. استعرض تفصيل بسيط في البداية عن عدد المصادر المكتشفة.
-
-5- **غياب المعلومات**: 
-   a. إذا لم تحتوِ المصادر على إجابة متعلقة بالسؤال وينطبق عليها ما ذكر ببند المطلوب أعلاه، أظهر للمستخدم الرسالة التالية بتنسيق جميل:
-   
-   # 🔍 لم يتم العثور على نتائج مطابقة
-   
-   [!WARNING] يظهر أنك لم تصف الحالة بشكل دقيق أو أن البند المطلوب لا توجد معلومات كافية عنه في قاعدة المعلومات.
-   
-   ## 💡 اقتراحات للبحث بشكل أفضل:
-   
-   - جرب صيغة أخرى للسؤال
-   - استخدم مسمى آخر للبند
-   - أضف شرحاً مبسطاً للحالة لديك
-
-6- **اللغة**: 
-   a. تكون لغة الإجابة بحسب لغة السؤال.
-   b. احتفظ بتنسيق Markdown حتى لو كانت اللغة غير عربية.
-
-7- **التفصيل**: 
-   a. اشرح كل مصدر على حدة بشكل واضح ومنظم.
-   b. استخدم التنسيق المناسب لكل قسم.
-
-8- **التنسيق العام**: 
-   a. احرص على استخدام الفواصل --- بين الأقسام الرئيسية.
-   b. استخدم العناوين بشكل هرمي صحيح (# ثم ## ثم ###).
-   c. استخدم الشارات والصناديق الملونة لإبراز المعلومات المهمة.
-   d. استخدم القوائم المنقطة أو المرقمة حيثما كان ذلك مناسباً.
-   e. أضف الرموز التعبيرية للعناوين لجعلها أكثر جاذبية."""
+   ## 💡 الخلاصة
+   [نصيحة نهائية]
+"""
 
         user_prompt = f"""السؤال:
 {question}
 
 المصادر المتاحة:
 {context}
-
-قم بتحليل المصادر المتاحة والإجابة على السؤال وفقاً للإرشادات المحددة مع الالتزام الدقيق بتنسيق Markdown المطلوب."""
+"""
 
         return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
-
 
 # Global instance
 llm_service = LLMService()
