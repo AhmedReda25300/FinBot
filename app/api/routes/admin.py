@@ -1,7 +1,7 @@
 """
 Admin endpoints for management operations
 """
-from typing import Dict
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorCollection
 from app.models.schemas import DeleteResponse, StatsResponse
@@ -25,6 +25,52 @@ async def delete_all_documents(
         return DeleteResponse(
             status="success",
             message=f"Deleted {result.deleted_count} documents",
+            deleted_count=result.deleted_count
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/delete", response_model=DeleteResponse)
+async def delete_documents_by_filters(
+    category: Optional[str] = None,
+    source_type: Optional[str] = None,
+    collection: AsyncIOMotorCollection = Depends(get_db_collection)
+):
+    """
+    Delete documents filtered by category and/or source type.
+
+    At least one filter must be provided.
+
+    Returns:
+        DeleteResponse with status and count
+    """
+    category = category.strip() if category else None
+    source_type = source_type.strip() if source_type else None
+
+    if not category and not source_type:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide at least one filter: category or source_type"
+        )
+
+    filter_query = {}
+    if category:
+        filter_query["metadata.category"] = category
+    if source_type:
+        filter_query["metadata.source_type"] = source_type
+
+    try:
+        result = await collection.delete_many(filter_query)
+        filters_used_parts = []
+        if category:
+            filters_used_parts.append(f"category='{category}'")
+        if source_type:
+            filters_used_parts.append(f"source_type='{source_type}'")
+        filters_used = ", ".join(filters_used_parts)
+        return DeleteResponse(
+            status="success",
+            message=f"Deleted {result.deleted_count} documents for {filters_used}",
             deleted_count=result.deleted_count
         )
     except Exception as e:
