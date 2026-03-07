@@ -43,7 +43,10 @@ async def ask_question(
         if request.category:
             mongo_filter['metadata.category'] = request.category
         if request.source_type:
-            mongo_filter['metadata.source_type'] = request.source_type
+            if isinstance(request.source_type, list):
+                mongo_filter['metadata.source_type'] = {'$in': request.source_type}
+            else:
+                mongo_filter['metadata.source_type'] = request.source_type
         
         # Retrieve all matching documents
         cursor = collection.find(mongo_filter)
@@ -140,7 +143,10 @@ async def ask_question_stream(
         if request.category:
             mongo_filter['metadata.category'] = request.category
         if request.source_type:
-            mongo_filter['metadata.source_type'] = {'$in': request.source_type}
+            if isinstance(request.source_type, list):
+                mongo_filter['metadata.source_type'] = {'$in': request.source_type}
+            else:
+                mongo_filter['metadata.source_type'] = request.source_type
         
         # Retrieve all matching documents
         cursor = collection.find(mongo_filter)

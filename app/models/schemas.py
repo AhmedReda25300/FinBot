@@ -12,6 +12,8 @@ class GuidelineDocument(BaseModel):
     content: str
     category: str
     source_type: str
+    page_number: Optional[Union[int, float, str, List[Union[int, float, str]]]] = None
+    page: Optional[Union[int, float, str, List[Union[int, float, str]]]] = None
 
 
 class DecisionDocument(BaseModel):

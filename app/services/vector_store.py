@@ -39,6 +39,9 @@ class VectorStoreService:
                     'chunk_title': doc.chunk_title,
                     'category': doc.category,
                     'source_type': doc.source_type,
+                    # Preserve page info (single value or list) when available.
+                    'page_number': doc.page_number,
+                    'page': doc.page,
                     'chunk_index': chunk_idx,
                     'total_chunks': len(text_chunks)
                 },

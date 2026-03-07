@@ -59,7 +59,7 @@ class LLMService:
     
     def _build_context(self, chunks: List[Dict[str, Any]]) -> str:
         """
-        Builds context focusing on 'chunk_title' and conditional 'page_number'.
+        Builds context focusing on 'chunk_title' and conditional page info.
         """
         source_type_mapping = {
             "Laws": "نظام / لائحة",
@@ -83,10 +83,13 @@ class LLMService:
             doc_title = ""
             excerpt_text = ""
             section_title = ""
+            source_filename = metadata.get('Source_Filename', metadata.get('source_filename', ''))
             
-            # Logic to find page number (if exists)
-            page_val = metadata.get('page_number') or metadata.get('page')
-            page_info = str(page_val) if page_val else None  # set to None if missing
+            # Normalize page metadata: supports scalar values and lists (e.g. [1, 2]).
+            page_val = metadata.get('page_number', metadata.get('page'))
+            if page_val is None:
+                page_val = chunk.get('page_number', chunk.get('page'))
+            page_info = self._format_page_info(page_val)
 
             # --- 2. Handle Decisions vs Standard Docs ---
             if raw_source_type == 'Decisions' or 'تفصيل_القرار' in metadata:
@@ -95,7 +98,8 @@ class LLMService:
                 decision_id = decision_details.get('رقم_القرار_النهائي', metadata.get('Source_Filename', 'Unknown'))
                 
                 doc_title = f"قرار رقم: {decision_id}"
-                doc_key = f"DEC_{decision_id}"
+                canonical_decision_key = source_filename or str(decision_id)
+                doc_key = f"DEC_{str(canonical_decision_key).strip().lower()}"
                 
                 # Handle Dispute Items as the "Text"
                 dispute_items = decision_details.get('البنود_محل_الدعوى', [])
@@ -115,8 +119,9 @@ class LLMService:
 
             else:
                 # Standard Document Logic (Guidelines/Laws) - MATCHING YOUR JSON
-                doc_title = metadata.get('document_title', metadata.get('Source_Filename', 'Unknown Document'))
-                doc_key = f"DOC_{doc_title}"
+                doc_title = metadata.get('document_title', source_filename or 'Unknown Document')
+                canonical_source_key = source_filename or doc_title
+                doc_key = f"DOC_{str(canonical_source_key).strip().lower()}"
                 
                 # Extract the chunk title explicitly
                 section_title = metadata.get('chunk_title', 'نص عام')
@@ -128,38 +133,43 @@ class LLMService:
                     "title": doc_title,
                     "type": display_source_type,
                     "max_score": score,
-                    "excerpts": []
+                    "excerpts": [],
+                    "_excerpt_keys": set()
                 }
+
+            # Prefer a richer title if current title is unknown/generic.
+            if grouped_docs[doc_key]["title"] in ("Unknown Document", "Unknown") and doc_title not in ("Unknown Document", "Unknown"):
+                grouped_docs[doc_key]["title"] = doc_title
             
             if score > grouped_docs[doc_key]["max_score"]:
                 grouped_docs[doc_key]["max_score"] = score
 
             # Add explicit metadata to the excerpt list
-            grouped_docs[doc_key]["excerpts"].append({
-                "section": section_title,
-                "text": excerpt_text,
-                "page": page_info  # Passes None if not found
-            })
+            excerpt_key = (section_title, excerpt_text, page_info)
+            if excerpt_key not in grouped_docs[doc_key]["_excerpt_keys"]:
+                grouped_docs[doc_key]["_excerpt_keys"].add(excerpt_key)
+                grouped_docs[doc_key]["excerpts"].append({
+                    "section": section_title,
+                    "text": excerpt_text,
+                    "page": page_info  # Passes None if not found
+                })
 
         # --- 4. Format String for LLM ---
         context_parts = []
         sorted_docs = sorted(grouped_docs.values(), key=lambda x: x['max_score'], reverse=True)
 
         for idx, doc in enumerate(sorted_docs, 1):
+            doc.pop("_excerpt_keys", None)
             excerpts_str = ""
             for i, exc in enumerate(doc['excerpts'], 1):
-                
-                # Handle Page Display in Context
-                if exc['page']:
-                    page_display = f"رقم الصفحة: {exc['page']}"
-                else:
-                    page_display = "رقم الصفحة: غير متوفر"
+
+                page_line = f"- رقم الصفحة: {exc['page']}\n" if exc['page'] else ""
 
                 # Construct the block
                 excerpts_str += f"""
                 >>> اقتباس رقم {i}:
                 - عنوان الفقرة (Chunk Title): {exc['section']}
-                - {page_display}
+                {page_line}
                 - النص:
                 {exc['text']}
                 --------------------------------------------------
@@ -176,6 +186,24 @@ class LLMService:
             context_parts.append(context_part)
         
         return "\n==================================================\n".join(context_parts)
+
+    def _format_page_info(self, page_value: Any) -> str:
+        """Returns a normalized page string or None when page info is missing."""
+        if page_value is None:
+            return None
+
+        if isinstance(page_value, list):
+            normalized_pages = []
+            for value in page_value:
+                if value is None:
+                    continue
+                text = str(value).strip()
+                if text:
+                    normalized_pages.append(text)
+            return ", ".join(normalized_pages) if normalized_pages else None
+
+        text = str(page_value).strip()
+        return text if text else None
     
     def _create_messages(self, question: str, context: str) -> List[Dict[str, str]]:
         """
@@ -187,11 +215,15 @@ class LLMService:
 إرشادات صارمة للإجابة:
 1. **الاعتماد على المصادر**: أجب بناءً فقط على المعلومات الواردة في "المصادر المتاحة".
 
-2. **التوثيق الدقيق (Citations)**:
-   - يجب ذكر **عنوان الفقرة (Chunk Title)** دائماً عند الاقتباس.
-   - **رقم الصفحة**: إذا كان "رقم الصفحة" متوفراً في المصدر، يجب ذكره (مثال: ص 5). **أما إذا كان غير متوفر، فلا تذكره نهائياً ولا تكتب "غير معروف"**.
+2. **تجميع المصدر الواحد**: إذا ظهرت عدة اقتباسات من نفس الملف/المصدر، تعامل معها كمصدر واحد فقط في الإجابة (لا تكرر نفس اسم الملف كمصدر مستقل).
 
-3. **تنسيق الإجابة (Markdown)**:
+3. **التوثيق الدقيق (Citations)**:
+   - يجب ذكر **عنوان الفقرة (Chunk Title)** دائماً عند الاقتباس.
+    - يجب أن يظهر **عنوان الفقرة في بداية المقطع المشروح** بهذا الشكل: `##### 🧩 [عنوان الفقرة]`.
+    - **رقم الصفحة**: إذا كان "رقم الصفحة" متوفراً في المصدر، اذكره **داخل سطر الشرح نفسه** وليس في قسم منفصل (مثال: `... وفقاً للنص (رقم الصفحة: 6)` أو `... (رقم الصفحة: 5، 6)`).
+    - إذا كان رقم الصفحة غير متوفر، لا تذكر الصفحة نهائياً.
+
+4. **تنسيق الإجابة (Markdown)**:
 
    # [عنوان الإجابة]
    
@@ -208,11 +240,8 @@ class LLMService:
    **النوع:** [نوع الملف]
    
    #### 📄 المحتوى ذو الصلة:
-   [شرح المحتوى...]
-   
-   📍 **موقع المعلومة:**
-   - **عنوان الفقرة:** [اكتب عنوان الفقرة هنا]
-   - **رقم الصفحة:** [اكتب الرقم فقط إذا وُجد، وإلا احذف هذا السطر]
+    ##### 🧩 [عنوان الفقرة (Chunk Title)]
+    [شرح المحتوى بشكل مباشر، مع إدراج رقم الصفحة داخل سطر الشرح إذا كان متوفراً مثل: (رقم الصفحة: 6)]
    
    ---
    
