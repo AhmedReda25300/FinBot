@@ -49,7 +49,7 @@ class ChatRequest(BaseModel):
     )
     num_chunks: int = Field(default=5, ge=1, le=20, description="Number of chunks to retrieve")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="LLM temperature")
-    model_name: Literal["gpt-4.1", "gpt-5-nano", "gpt-5-mini"] = Field(
+    model_name: Literal["gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini"] = Field(
         default="gpt-4.1",
         description="LLM model to use"
     )

@@ -18,7 +18,7 @@ class LLMService:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         self.client = client
         self.model_name = settings.LLM_MODEL
-        self.allowed_models = {"gpt-4.1", "gpt-5-nano", "gpt-5-mini"}
+        self.allowed_models = {"gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini"}
 
     def resolve_model_name(self, model_name: str = None) -> str:
         """Return a safe model name, falling back to configured default when invalid/missing."""
