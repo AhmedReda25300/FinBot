@@ -18,7 +18,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 10px; /* تم التقليل لزيادة المساحة */
+            overflow: hidden; /* لمنع ظهور شريط تمرير خارجي */
         }
 
         .container {
@@ -26,20 +27,15 @@
             gap: 20px;
             width: 100%;
             max-width: 1600px;
-            height: 90vh;
+            height: calc(100vh - 20px); /* زيادة الارتفاع ليأخذ كامل الشاشة تقريباً */
+            transition: gap 0.3s ease;
+        }
+
+        .container.sidebar-closed {
+            gap: 0;
         }
 
         .chat-section {
-            flex: 2;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .sources-section {
             flex: 1;
             background: white;
             border-radius: 20px;
@@ -49,22 +45,87 @@
             overflow: hidden;
         }
 
+        /* --- Sidebar Styles --- */
+        .sources-section {
+            width: 350px;
+            flex-shrink: 0;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: width 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+        }
+
+        .container.sidebar-closed .sources-section {
+            width: 0;
+            opacity: 0;
+            margin-right: -20px;
+            pointer-events: none;
+        }
+
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px;
-            text-align: center;
-            font-size: 24px;
+            padding: 12px 20px; /* تم التقليل لتوفير مساحة للمحادثة */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            font-size: 22px; /* تصغير طفيف */
             font-weight: bold;
+        }
+
+        .toggle-sidebar-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .toggle-sidebar-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
         }
 
         .sources-header {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
-            padding: 15px;
+            padding: 12px;
             text-align: center;
             font-size: 18px;
             font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .sidebar-options {
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-shrink: 0;
+        }
+
+        .sources-list-header {
+            background: #e9ecef;
+            color: #495057;
+            padding: 10px 15px;
+            font-size: 14px;
+            font-weight: bold;
+            border-bottom: 1px solid #dee2e6;
+            flex-shrink: 0;
         }
 
         /* Tabs */
@@ -76,7 +137,7 @@
 
         .tab {
             flex: 1;
-            padding: 15px 20px;
+            padding: 12px 20px; /* تم التقليل لتوفير مساحة */
             text-align: center;
             cursor: pointer;
             font-weight: 600;
@@ -106,21 +167,12 @@
             display: flex;
         }
 
-        /* Chat Tab & Filters */
-        .filters {
-            padding: 15px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }
-
+        /* Filters inside Sidebar */
         .filter-group {
             display: flex;
             flex-direction: column;
             gap: 5px;
+            width: 100%;
         }
 
         .filter-group label {
@@ -138,7 +190,8 @@
             font-size: 14px;
             outline: none;
             transition: border-color 0.3s;
-            height: 38px; /* Fixed height for alignment */
+            height: 38px;
+            width: 100%;
         }
 
         .filter-group select:focus,
@@ -146,10 +199,10 @@
             border-color: #667eea;
         }
 
-        /* --- New Multi-Select Styles --- */
+        /* Multi-Select Styles */
         .multi-select-container {
             position: relative;
-            width: 180px;
+            width: 100%;
             font-family: inherit;
         }
 
@@ -191,7 +244,7 @@
             margin-top: 5px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             z-index: 1000;
-            max-height: 250px;
+            max-height: 200px;
             overflow-y: auto;
             padding: 5px;
         }
@@ -226,7 +279,6 @@
             font-size: 13px;
             color: #333;
         }
-        /* --- End Multi-Select Styles --- */
 
         .chat-messages {
             flex: 1;
@@ -239,6 +291,7 @@
             flex: 1;
             overflow-y: auto;
             padding: 15px;
+            background: #fff;
         }
 
         /* Settings Tab */
@@ -312,42 +365,14 @@
             transition: all 0.3s;
         }
 
-        .btn-save {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-save:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-reset {
-            background: #e0e0e0;
-            color: #333;
-        }
-
-        .btn-reset:hover {
-            background: #d0d0d0;
-        }
-
-        .btn-export {
-            background: #4caf50;
-            color: white;
-        }
-
-        .btn-export:hover {
-            background: #45a049;
-        }
-
-        .btn-import {
-            background: #2196f3;
-            color: white;
-        }
-
-        .btn-import:hover {
-            background: #0b7dda;
-        }
+        .btn-save { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-save:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .btn-reset { background: #e0e0e0; color: #333; }
+        .btn-reset:hover { background: #d0d0d0; }
+        .btn-export { background: #4caf50; color: white; }
+        .btn-export:hover { background: #45a049; }
+        .btn-import { background: #2196f3; color: white; }
+        .btn-import:hover { background: #0b7dda; }
 
         .status-badge {
             display: inline-block;
@@ -358,58 +383,24 @@
             margin-right: 10px;
         }
 
-        .status-default {
-            background: #e8f5e9;
-            color: #388e3c;
-        }
+        .status-default { background: #e8f5e9; color: #388e3c; }
+        .status-modified { background: #fff3e0; color: #f57c00; }
 
-        .status-modified {
-            background: #fff3e0;
-            color: #f57c00;
-        }
+        .info-box { background: #e3f2fd; border-right: 4px solid #2196f3; padding: 12px 15px; margin: 15px 0; border-radius: 8px; font-size: 13px; line-height: 1.5; }
+        .warning-box { background: #fff3e0; border-right: 4px solid #ff9800; padding: 12px 15px; margin: 15px 0; border-radius: 8px; font-size: 13px; line-height: 1.5; }
 
-        .info-box {
-            background: #e3f2fd;
-            border-right: 4px solid #2196f3;
-            padding: 12px 15px;
-            margin: 15px 0;
-            border-radius: 8px;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
-        .warning-box {
-            background: #fff3e0;
-            border-right: 4px solid #ff9800;
-            padding: 12px 15px;
-            margin: 15px 0;
-            border-radius: 8px;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
-        .message {
-            margin-bottom: 20px;
-            animation: fadeIn 0.3s ease-in;
-        }
+        .message { margin-bottom: 20px; animation: fadeIn 0.3s ease-in; }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .message.user {
-            display: flex;
-            justify-content: flex-start;
-        }
-
-        .message.assistant {
-            display: flex;
-            justify-content: flex-end;
-        }
+        .message.user { display: flex; justify-content: flex-start; }
+        .message.assistant { display: flex; justify-content: flex-end; }
 
         .message-content {
-            max-width: 70%;
+            max-width: 80%;
             padding: 15px 20px;
             border-radius: 18px;
             line-height: 1.8;
@@ -432,25 +423,9 @@
         /* Markdown Styles */
         .message.assistant .message-content h1,
         .message.assistant .message-content h2,
-        .message.assistant .message-content h3 {
-            color: #667eea;
-            margin-top: 15px;
-            margin-bottom: 10px;
-            font-weight: 600;
-        }
-
-        .message.assistant .message-content h1 {
-            font-size: 20px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 8px;
-        }
-
-        .message.assistant .message-content h2 {
-            font-size: 18px;
-            border-right: 4px solid #667eea;
-            padding-right: 12px;
-        }
-
+        .message.assistant .message-content h3 { color: #667eea; margin-top: 15px; margin-bottom: 10px; font-weight: 600; }
+        .message.assistant .message-content h1 { font-size: 20px; border-bottom: 2px solid #667eea; padding-bottom: 8px; }
+        .message.assistant .message-content h2 { font-size: 18px; border-right: 4px solid #667eea; padding-right: 12px; }
         .message.assistant .message-content h3 { font-size: 16px; color: #764ba2; }
         .message.assistant .message-content h4 { font-size: 15px; color: #555; margin-top: 12px; margin-bottom: 8px; }
         .message.assistant .message-content ul, .message.assistant .message-content ol { margin: 10px 0; padding-right: 25px; }
@@ -493,23 +468,11 @@
             margin-bottom: 8px;
         }
 
-        .source-text {
-            font-size: 13px;
-            color: #555;
-            line-height: 1.5;
-            margin-bottom: 8px;
-        }
-
-        .source-meta {
-            font-size: 11px;
-            color: #888;
-            border-top: 1px solid #dee2e6;
-            padding-top: 8px;
-            margin-top: 8px;
-        }
+        .source-text { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 8px; }
+        .source-meta { font-size: 11px; color: #888; border-top: 1px solid #dee2e6; padding-top: 8px; margin-top: 8px; }
 
         .input-area {
-            padding: 20px;
+            padding: 15px 20px; /* تم تقليل المساحة السفلية لزيادة المحادثة */
             background: white;
             border-top: 1px solid #dee2e6;
             display: flex;
@@ -518,7 +481,7 @@
 
         .input-area input {
             flex: 1;
-            padding: 15px 20px;
+            padding: 12px 20px;
             border: 2px solid #e0e0e0;
             border-radius: 25px;
             font-size: 15px;
@@ -526,12 +489,10 @@
             transition: border-color 0.3s;
         }
 
-        .input-area input:focus {
-            border-color: #667eea;
-        }
+        .input-area input:focus { border-color: #667eea; }
 
         .input-area button {
-            padding: 15px 30px;
+            padding: 12px 30px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
@@ -542,16 +503,8 @@
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .input-area button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .input-area button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
+        .input-area button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
+        .input-area button:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none;}
 
         .loading { display: flex; gap: 5px; padding: 10px; }
         .loading-dot { width: 8px; height: 8px; border-radius: 50%; background: #667eea; animation: bounce 1.4s infinite ease-in-out both; }
@@ -576,16 +529,7 @@
         ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
 
-        .error-message {
-            background: #fee;
-            border: 1px solid #fcc;
-            color: #c33;
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin: 10px 20px;
-            font-size: 14px;
-        }
-
+        .error-message { background: #fee; border: 1px solid #fcc; color: #c33; padding: 10px 15px; border-radius: 8px; margin: 10px 20px; font-size: 14px; }
         .char-count { font-size: 12px; color: #888; margin-top: 5px; text-align: left; }
         input[type="file"] { display: none; }
         .file-input-label { padding: 10px 20px; background: #2196f3; color: white; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block; }
@@ -593,11 +537,18 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="container" id="mainContainer">
+        
         <!-- Chat Section -->
         <div class="chat-section">
             <div class="header">
-                💬 مساعد الضرائب الذكي
+                <div class="header-title">💬 مساعد الضرائب الذكي</div>
+                <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="إظهار/إخفاء الخيارات والمصادر">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    المصادر والخيارات
+                </button>
             </div>
             
             <!-- Tabs -->
@@ -606,72 +557,13 @@
                     💬 المحادثة
                 </div>
                 <div class="tab" onclick="switchTab('settings')">
-                    ⚙️ الإعدادات
+                    ⚙️ الإعدادات (System Prompt)
                 </div>
             </div>
 
             <!-- Chat Tab Content -->
             <div id="chatTab" class="tab-content active">
-                <div class="filters">
-                    <div class="filter-group">
-                        <label>category</label>
-                        <select id="category">
-                            <option value="EXIS-TAX">EXIS-TAX</option>
-                            <option value="ICT-WHT">ICT-WHT</option>
-                            <option value="RETT">RETT</option>
-                            <option value="VAT">VAT</option>
-                            <option value="ZA-1440">ZA-1440</option>
-                            <option value="ZA-1445">ZA-1445</option>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label>sourceType</label>
-                        <!-- New Multi-Select Dropdown -->
-                        <div class="multi-select-container" id="sourceTypeContainer">
-                            <div class="multi-select-trigger" onclick="toggleMultiSelect()">
-                                <span id="selectedSourceText">اختر المصادر...</span>
-                            </div>
-                            <div class="multi-select-options" id="sourceOptions">
-                                <label class="option-item">
-                                    <input type="checkbox" value="Publications" checked onchange="updateSelectedText()">
-                                    <span>Publications</span>
-                                </label>
-                                <label class="option-item">
-                                    <input type="checkbox" value="Decisions" checked onchange="updateSelectedText()">
-                                    <span>Decisions</span>
-                                </label>
-                                <label class="option-item">
-                                    <input type="checkbox" value="Guidelines" checked onchange="updateSelectedText()">
-                                    <span>Guidelines</span>
-                                </label>
-                                <label class="option-item">
-                                    <input type="checkbox" value="Laws" checked onchange="updateSelectedText()">
-                                    <span>Laws</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label>عدد المصادر</label>
-                        <input type="number" id="numChunks" value="5" min="1" max="20" style="width: 80px;">
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label>الإبداعية</label>
-                        <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1" style="width: 80px;">
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label>وضع البث</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; height: 38px;">
-                            <input type="checkbox" id="streamingToggle" checked onchange="toggleStreaming()" style="width: auto;">
-                            <span id="streamingLabel">مفعّل</span>
-                        </label>
-                    </div>
-                </div>
-
+                
                 <div class="chat-messages" id="chatMessages">
                     <div class="empty-state">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -710,6 +602,15 @@
                             ℹ️ <strong>ملاحظة:</strong> التعديلات ستُحفظ في متصفحك فقط ولن تؤثر على المستخدمين الآخرين. يمكنك دائماً الرجوع للنسخة الافتراضية.
                         </div>
 
+                        <div class="filter-group" style="margin-bottom: 12px;">
+                            <label for="modelSelect">النموذج (Model)</label>
+                            <select id="modelSelect" onchange="saveModelSelection()">
+                                <option value="gpt-4.1">gpt-4.1</option>
+                                <option value="gpt-5-nano">gpt-5-nano</option>
+                                <option value="gpt-5-mini">gpt-5-mini</option>
+                            </select>
+                        </div>
+
                         <textarea 
                             id="systemPrompt" 
                             class="prompt-editor"
@@ -720,15 +621,9 @@
                         <div class="char-count" id="charCount">0 حرف</div>
 
                         <div class="settings-buttons">
-                            <button class="btn-save" onclick="saveCustomPrompt()">
-                                💾 حفظ التعديلات
-                            </button>
-                            <button class="btn-reset" onclick="resetToDefault()">
-                                🔄 الرجوع للافتراضي
-                            </button>
-                            <button class="btn-export" onclick="exportPrompt()">
-                                📥 تصدير
-                            </button>
+                            <button class="btn-save" onclick="saveCustomPrompt()">💾 حفظ التعديلات</button>
+                            <button class="btn-reset" onclick="resetToDefault()">🔄 الرجوع للافتراضي</button>
+                            <button class="btn-export" onclick="exportPrompt()">📥 تصدير</button>
                             <label class="file-input-label">
                                 📤 استيراد
                                 <input type="file" id="importFile" accept=".txt,.json" onchange="importPrompt(event)">
@@ -754,9 +649,76 @@
             </div>
         </div>
 
-        <!-- Sources Section -->
-        <div class="sources-section">
+        <!-- Options & Sources Section (Sidebar) -->
+        <div class="sources-section" id="sidebar">
             <div class="sources-header">
+                ⚙️ الخيارات والمصادر
+            </div>
+
+            <!-- Relocated Top Options -->
+            <div class="sidebar-options">
+                <div class="filter-group">
+                    <label>الفئة (Category)</label>
+                    <select id="category">
+                        <option value="EXIS-TAX">EXIS-TAX</option>
+                        <option value="ICT-WHT">ICT-WHT</option>
+                        <option value="RETT">RETT</option>
+                        <option value="VAT">VAT</option>
+                        <option value="ZA-1440">ZA-1440</option>
+                        <option value="ZA-1445">ZA-1445</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label>أنواع المصادر (Source Type)</label>
+                    <div class="multi-select-container" id="sourceTypeContainer">
+                        <div class="multi-select-trigger" onclick="toggleMultiSelect()">
+                            <span id="selectedSourceText">اختر المصادر...</span>
+                        </div>
+                        <div class="multi-select-options" id="sourceOptions">
+                            <label class="option-item">
+                                <input type="checkbox" value="Publications" checked onchange="updateSelectedText()">
+                                <span>Publications</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" value="Decisions" checked onchange="updateSelectedText()">
+                                <span>Decisions</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" value="Guidelines" checked onchange="updateSelectedText()">
+                                <span>Guidelines</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" value="Laws" checked onchange="updateSelectedText()">
+                                <span>Laws</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 15px;">
+                    <div class="filter-group" style="flex: 1;">
+                        <label>عدد المصادر</label>
+                        <input type="number" id="numChunks" value="5" min="1" max="20">
+                    </div>
+                    
+                    <div class="filter-group" style="flex: 1;">
+                        <label>الإبداعية</label>
+                        <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1">
+                    </div>
+                </div>
+                
+                <div class="filter-group">
+                    <label>وضع البث (Streaming)</label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; height: 38px; background: white; padding: 0 12px; border: 1px solid #ddd; border-radius: 8px;">
+                        <input type="checkbox" id="streamingToggle" checked onchange="toggleStreaming()" style="width: 16px; height: 16px;">
+                        <span id="streamingLabel">مفعّل</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Retrieved Sources -->
+            <div class="sources-list-header">
                 📚 المصادر المسترجعة
             </div>
             <div class="sources-list" id="sourcesList">
@@ -772,11 +734,11 @@
 
     <script>
         const API_BASE_URL = window.location.origin;
-        let chatHistory = [];
+        let chatHistory =[];
         let useStreaming = true;
         let customPrompt = null;
+        let selectedModel = 'gpt-4.1';
 
-        // Default system prompt
         const DEFAULT_SYSTEM_PROMPT = `إرشادات للإجابة:
 
 1- **المطلوب**: 
@@ -803,9 +765,7 @@
    
    ---
    
-   ## 📋 نظرة عامة
-   
-   [!INFO] [ملخص سريع]
+   ## 📋 نظرة عامة[!INFO] [ملخص سريع]
    
    **عدد المصادر:** {{badge-primary:[عدد] مصدر}}
    **الموثوقية:** {{badge-success:عالية}}
@@ -832,17 +792,23 @@
    - --- للفواصل
    - **نص** للغامق
    - {{badge-primary:نص}} {{badge-success:نص}} {{badge-warning:نص}} {{badge-info:نص}}
-   - [!INFO] [!WARNING] [!SUCCESS] للصناديق
+   -[!INFO] [!WARNING][!SUCCESS] للصناديق
    - - أو * للقوائم
    - 📚 📋 💡 ⚠️ ✅ للرموز`;
 
 
-        // Load saved prompt on page load
         document.addEventListener('DOMContentLoaded', () => {
             loadSavedPrompt();
-            updateSelectedText(); // Initialize multi-select text
+            loadSavedModel();
+            updateSelectedText(); 
             document.getElementById('userInput').focus();
         });
+
+        /* --- Toggle Sidebar Logic --- */
+        function toggleSidebar() {
+            const container = document.getElementById('mainContainer');
+            container.classList.toggle('sidebar-closed');
+        }
 
         /* --- Multi-Select Logic --- */
         function toggleMultiSelect() {
@@ -867,7 +833,6 @@
             }
         }
 
-        // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
             const container = document.getElementById('sourceTypeContainer');
             const options = document.getElementById('sourceOptions');
@@ -875,7 +840,6 @@
                 options.classList.remove('show');
             }
         });
-        /* --- End Multi-Select Logic --- */
 
         // Tab switching
         function switchTab(tabName) {
@@ -896,98 +860,61 @@
             }
         }
 
-        // Load saved prompt from localStorage
+        // System prompt logic
         function loadSavedPrompt() {
             const saved = localStorage.getItem('customSystemPrompt');
             const promptEditor = document.getElementById('systemPrompt');
-            
-            if (saved) {
-                customPrompt = saved;
-                promptEditor.value = saved;
-                updatePromptStatus('modified');
-            } else {
-                promptEditor.value = DEFAULT_SYSTEM_PROMPT;
-                updatePromptStatus('default');
-            }
-            
+            if (saved) { customPrompt = saved; promptEditor.value = saved; updatePromptStatus('modified'); } 
+            else { promptEditor.value = DEFAULT_SYSTEM_PROMPT; updatePromptStatus('default'); }
             updateCharCount();
         }
 
-        // Mark prompt as modified
         function markPromptAsModified() {
             const promptEditor = document.getElementById('systemPrompt');
             const currentValue = promptEditor.value;
-            
-            if (currentValue !== DEFAULT_SYSTEM_PROMPT && currentValue.trim() !== '') {
-                promptEditor.classList.add('modified');
-            } else {
-                promptEditor.classList.remove('modified');
-            }
-            
+            if (currentValue !== DEFAULT_SYSTEM_PROMPT && currentValue.trim() !== '') { promptEditor.classList.add('modified'); } 
+            else { promptEditor.classList.remove('modified'); }
             updateCharCount();
         }
 
-        // Update character count
         function updateCharCount() {
             const promptEditor = document.getElementById('systemPrompt');
             const charCount = document.getElementById('charCount');
-            const length = promptEditor.value.length;
-            charCount.textContent = `${length.toLocaleString()} حرف`;
+            charCount.textContent = `${promptEditor.value.length.toLocaleString()} حرف`;
         }
 
-        // Update prompt status badge
         function updatePromptStatus(status) {
             const statusBadge = document.getElementById('promptStatus');
-            
-            if (status === 'default') {
-                statusBadge.className = 'status-badge status-default';
-                statusBadge.textContent = 'النسخة الافتراضية';
-            } else {
-                statusBadge.className = 'status-badge status-modified';
-                statusBadge.textContent = 'نسخة معدّلة';
-            }
+            if (status === 'default') { statusBadge.className = 'status-badge status-default'; statusBadge.textContent = 'النسخة الافتراضية'; } 
+            else { statusBadge.className = 'status-badge status-modified'; statusBadge.textContent = 'نسخة معدّلة'; }
         }
 
-        // Save custom prompt
         function saveCustomPrompt() {
             const promptEditor = document.getElementById('systemPrompt');
             const value = promptEditor.value.trim();
-            
-            if (!value) {
-                alert('لا يمكن حفظ تعليمات فارغة');
-                return;
-            }
-            
+            if (!value) { alert('لا يمكن حفظ تعليمات فارغة'); return; }
             localStorage.setItem('customSystemPrompt', value);
             customPrompt = value;
             promptEditor.classList.remove('modified');
             updatePromptStatus('modified');
-            
             alert('✅ تم حفظ التعديلات بنجاح!');
         }
 
-        // Reset to default prompt
         function resetToDefault() {
             if (confirm('هل أنت متأكد من الرجوع للتعليمات الافتراضية؟ سيتم فقدان التعديلات الحالية.')) {
                 localStorage.removeItem('customSystemPrompt');
                 customPrompt = null;
-                
                 const promptEditor = document.getElementById('systemPrompt');
                 promptEditor.value = DEFAULT_SYSTEM_PROMPT;
                 promptEditor.classList.remove('modified');
-                
                 updatePromptStatus('default');
                 updateCharCount();
-                
                 alert('✅ تم الرجوع للتعليمات الافتراضية');
             }
         }
 
-        // Export prompt
         function exportPrompt() {
-            const promptEditor = document.getElementById('systemPrompt');
-            const content = promptEditor.value;
-            
+            const content = document.getElementById('systemPrompt').value;
             const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -999,15 +926,12 @@
             URL.revokeObjectURL(url);
         }
 
-        // Import prompt
         function importPrompt(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
             const reader = new FileReader();
             reader.onload = function(e) {
-                const content = e.target.result;
-                document.getElementById('systemPrompt').value = content;
+                document.getElementById('systemPrompt').value = e.target.result;
                 markPromptAsModified();
                 alert('✅ تم استيراد التعليمات بنجاح! لا تنسى الضغط على "حفظ التعديلات"');
             };
@@ -1019,10 +943,31 @@
             return customPrompt || DEFAULT_SYSTEM_PROMPT;
         }
 
+        function loadSavedModel() {
+            const modelSelect = document.getElementById('modelSelect');
+            if (!modelSelect) return;
+
+            const savedModel = localStorage.getItem('selectedModel');
+            const allowedModels = ['gpt-4.1', 'gpt-5-nano', 'gpt-5-mini'];
+            selectedModel = allowedModels.includes(savedModel) ? savedModel : 'gpt-4.1';
+            modelSelect.value = selectedModel;
+        }
+
+        function saveModelSelection() {
+            const modelSelect = document.getElementById('modelSelect');
+            if (!modelSelect) return;
+
+            selectedModel = modelSelect.value;
+            localStorage.setItem('selectedModel', selectedModel);
+        }
+
+        function getSelectedModel() {
+            return selectedModel || 'gpt-4.1';
+        }
+
         // Markdown parser
         function parseMarkdown(text) {
             let html = text;
-            
             html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
             html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
             html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
@@ -1041,53 +986,34 @@
             
             const lines = html.split('\n');
             let inList = false;
-            let processedLines = [];
+            let processedLines =[];
             
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
                 const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
                 
                 if (line.match(/^[\-\*] /)) {
-                    if (!inList) {
-                        processedLines.push('<ul>');
-                        inList = true;
-                    }
+                    if (!inList) { processedLines.push('<ul>'); inList = true; }
                     processedLines.push('<li>' + line.replace(/^[\-\*] /, '') + '</li>');
-                    
-                    if (!nextLine.match(/^[\-\*] /)) {
-                        processedLines.push('</ul>');
-                        inList = false;
-                    }
+                    if (!nextLine.match(/^[\-\*] /)) { processedLines.push('</ul>'); inList = false; }
                 } else if (line.match(/^\d+\. /)) {
-                    if (!inList) {
-                        processedLines.push('<ol>');
-                        inList = true;
-                    }
+                    if (!inList) { processedLines.push('<ol>'); inList = true; }
                     processedLines.push('<li>' + line.replace(/^\d+\. /, '') + '</li>');
-                    
-                    if (!nextLine.match(/^\d+\. /)) {
-                        processedLines.push('</ol>');
-                        inList = false;
-                    }
-                } else {
-                    processedLines.push(line);
-                }
+                    if (!nextLine.match(/^\d+\. /)) { processedLines.push('</ol>'); inList = false; }
+                } else { processedLines.push(line); }
             }
             
             html = processedLines.join('\n');
             html = html.replace(/^(?!<[h|u|o|d|l|p|b])(.*?)$/gim, '<p>$1</p>');
             html = html.replace(/<p><\/p>/g, '');
             html = html.replace(/<p>\s*<\/p>/g, '');
-            
             return html;
         }
 
         function addMessage(role, content, isStreaming = false) {
             const messagesDiv = document.getElementById('chatMessages');
             const emptyState = messagesDiv.querySelector('.empty-state');
-            if (emptyState) {
-                emptyState.remove();
-            }
+            if (emptyState) emptyState.remove();
 
             if (isStreaming && role === 'assistant') {
                 const existingMessage = document.getElementById('streamingMessage');
@@ -1101,26 +1027,19 @@
 
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
-            if (isStreaming && role === 'assistant') {
-                messageDiv.id = 'streamingMessage';
-            }
+            if (isStreaming && role === 'assistant') messageDiv.id = 'streamingMessage';
             
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
             
-            if (role === 'assistant') {
-                contentDiv.innerHTML = parseMarkdown(content);
-            } else {
-                contentDiv.textContent = content;
-            }
+            if (role === 'assistant') contentDiv.innerHTML = parseMarkdown(content);
+            else contentDiv.textContent = content;
             
             messageDiv.appendChild(contentDiv);
             messagesDiv.appendChild(messageDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
-            if (!isStreaming) {
-                chatHistory.push({ role, content });
-            }
+            if (!isStreaming) chatHistory.push({ role, content });
         }
 
         function finalizeStreamingMessage() {
@@ -1153,9 +1072,7 @@
 
         function removeLoading() {
             const loadingMessage = document.getElementById('loadingMessage');
-            if (loadingMessage) {
-                loadingMessage.remove();
-            }
+            if (loadingMessage) loadingMessage.remove();
         }
 
         function showError(message) {
@@ -1170,9 +1087,7 @@
         function displaySources(sources) {
             const sourcesList = document.getElementById('sourcesList');
             const emptyState = sourcesList.querySelector('.empty-state');
-            if (emptyState) {
-                emptyState.remove();
-            }
+            if (emptyState) emptyState.remove();
             
             sourcesList.innerHTML = '';
 
@@ -1181,7 +1096,11 @@
                 return;
             }
 
-            sources.forEach((source, index) => {
+            // Make sure the sidebar is open when sources arrive
+            const container = document.getElementById('mainContainer');
+            container.classList.remove('sidebar-closed');
+
+            sources.forEach((source) => {
                 const sourceCard = document.createElement('div');
                 sourceCard.className = 'source-card';
                 
@@ -1197,7 +1116,7 @@
                 metaDiv.className = 'source-meta';
                 
                 const metadata = source.metadata;
-                let metaInfo = [];
+                let metaInfo =[];
                 
                 if (metadata.document_title) metaInfo.push(`📄 ${metadata.document_title}`);
                 if (metadata.decision_id) metaInfo.push(`📋 قرار: ${metadata.decision_id}`);
@@ -1230,36 +1149,21 @@
             showLoading();
 
             const category = document.getElementById('category').value;
-            
-            // Get selected sources from the multi-select checkboxes
-            const selectedSources = Array.from(
-                document.querySelectorAll('#sourceOptions input[type="checkbox"]:checked')
-            ).map(cb => cb.value);
-
+            const selectedSources = Array.from(document.querySelectorAll('#sourceOptions input[type="checkbox"]:checked')).map(cb => cb.value);
             const numChunks = parseInt(document.getElementById('numChunks').value);
             const temperature = parseFloat(document.getElementById('temperature').value);
+            const modelName = getSelectedModel();
 
-            const requestBody = {
-                question: question,
-                num_chunks: numChunks,
-                temperature: temperature
-            };
-
+            const requestBody = { question: question, num_chunks: numChunks, temperature: temperature, model_name: modelName };
             if (category) requestBody.category = category;
-            // Send source_type as an array if items are selected
             if (selectedSources.length > 0) requestBody.source_type = selectedSources;
 
             const currentPrompt = getCurrentSystemPrompt();
-            if (currentPrompt !== DEFAULT_SYSTEM_PROMPT) {
-                requestBody.custom_system_prompt = currentPrompt;
-            }
+            if (currentPrompt !== DEFAULT_SYSTEM_PROMPT) requestBody.custom_system_prompt = currentPrompt;
 
             try {
-                if (useStreaming) {
-                    await sendStreamingRequest(requestBody);
-                } else {
-                    await sendRegularRequest(requestBody);
-                }
+                if (useStreaming) await sendStreamingRequest(requestBody);
+                else await sendRegularRequest(requestBody);
             } catch (error) {
                 removeLoading();
                 console.error('Error:', error);
@@ -1279,7 +1183,6 @@
             });
 
             removeLoading();
-
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
@@ -1307,7 +1210,6 @@
 
             while (true) {
                 const { done, value } = await reader.read();
-                
                 if (done) break;
 
                 buffer += decoder.decode(value, { stream: true });
@@ -1318,20 +1220,12 @@
                     const trimmedLine = line.trim();
                     if (trimmedLine.startsWith('data: ')) {
                         const jsonStr = trimmedLine.substring(6);
-                        
                         try {
                             const data = JSON.parse(jsonStr);
-                            
-                            if (data.type === 'sources') {
-                                displaySources(data.content);
-                            } else if (data.type === 'answer') {
-                                fullAnswer += data.content;
-                                addMessage('assistant', fullAnswer, true);
-                            } else if (data.type === 'done') {
-                                finalizeStreamingMessage();
-                            } else if (data.type === 'error') {
-                                showError(data.content);
-                            }
+                            if (data.type === 'sources') displaySources(data.content);
+                            else if (data.type === 'answer') { fullAnswer += data.content; addMessage('assistant', fullAnswer, true); }
+                            else if (data.type === 'done') finalizeStreamingMessage();
+                            else if (data.type === 'error') showError(data.content);
                         } catch (e) {
                             console.error("Error parsing SSE JSON:", e);
                         }

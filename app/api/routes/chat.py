@@ -84,6 +84,7 @@ async def ask_question(
                 question=request.question,
                 context_chunks=top_chunks,
                 temperature=request.temperature,
+                model_name=request.model_name,
                 custom_prompt=request.custom_system_prompt
             )
         else:
@@ -91,7 +92,8 @@ async def ask_question(
             answer = llm_svc.generate_answer(
                 question=request.question,
                 context_chunks=top_chunks,
-                temperature=request.temperature
+                temperature=request.temperature,
+                model_name=request.model_name
             )
         
         # Prepare sources for response
@@ -210,6 +212,7 @@ async def ask_question_stream(
                         question=request.question,
                         context_chunks=top_chunks,
                         temperature=request.temperature,
+                        model_name=request.model_name,
                         custom_prompt=request.custom_system_prompt
                     ):
                         answer_event = {
@@ -222,7 +225,8 @@ async def ask_question_stream(
                     async for chunk in llm_svc.generate_answer_stream(
                         question=request.question,
                         context_chunks=top_chunks,
-                        temperature=request.temperature
+                        temperature=request.temperature,
+                        model_name=request.model_name
                     ):
                         answer_event = {
                             "type": "answer",
@@ -264,6 +268,7 @@ async def _generate_with_custom_prompt(
     question: str,
     context_chunks: list,
     temperature: float,
+    model_name: str,
     custom_prompt: str
 ) -> str:
     """
@@ -293,7 +298,7 @@ async def _generate_with_custom_prompt(
     
     # Generate response
     response = await llm_svc.client.chat.completions.create(
-        model=llm_svc.model_name,
+        model=llm_svc.resolve_model_name(model_name),
         messages=messages,
         temperature=temperature,
         max_tokens=4096,
@@ -307,6 +312,7 @@ async def _generate_stream_with_custom_prompt(
     question: str,
     context_chunks: list,
     temperature: float,
+    model_name: str,
     custom_prompt: str
 ):
     """
@@ -336,7 +342,7 @@ async def _generate_stream_with_custom_prompt(
     
     # Generate streaming response
     stream = await llm_svc.client.chat.completions.create(
-        model=llm_svc.model_name,
+        model=llm_svc.resolve_model_name(model_name),
         messages=messages,
         temperature=temperature,
         max_tokens=4096,

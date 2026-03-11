@@ -1,7 +1,7 @@
 """
 Pydantic models for request and response validation
 """
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, Literal
 from pydantic import BaseModel, Field
 
 
@@ -49,6 +49,10 @@ class ChatRequest(BaseModel):
     )
     num_chunks: int = Field(default=5, ge=1, le=20, description="Number of chunks to retrieve")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="LLM temperature")
+    model_name: Literal["gpt-4.1", "gpt-5-nano", "gpt-5-mini"] = Field(
+        default="gpt-4.1",
+        description="LLM model to use"
+    )
     custom_system_prompt: Optional[str] = Field(None, description="Custom system prompt for LLM")
 
 

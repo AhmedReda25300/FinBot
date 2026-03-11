@@ -18,21 +18,30 @@ class LLMService:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         self.client = client
         self.model_name = settings.LLM_MODEL
+        self.allowed_models = {"gpt-4.1", "gpt-5-nano", "gpt-5-mini"}
+
+    def resolve_model_name(self, model_name: str = None) -> str:
+        """Return a safe model name, falling back to configured default when invalid/missing."""
+        candidate = (model_name or "").strip()
+        if candidate in self.allowed_models:
+            return candidate
+        return self.model_name
     
     def generate_answer(
         self, 
         question: str, 
         context_chunks: List[Dict[str, Any]],
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        model_name: str = None
     ) -> str:
         context = self._build_context(context_chunks)
         messages = self._create_messages(question, context)
         
         response = self.client.chat.completions.create(
-            model=self.model_name,
+            model=self.resolve_model_name(model_name),
             messages=messages,
-            temperature=temperature,
-            max_tokens=4096,
+            # temperature=temperature,
+            # max_tokens=4096,
         )
         return response.choices[0].message.content
 
@@ -40,16 +49,17 @@ class LLMService:
         self, 
         question: str, 
         context_chunks: List[Dict[str, Any]],
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        model_name: str = None
     ) -> AsyncIterator[str]:
         context = self._build_context(context_chunks)
         messages = self._create_messages(question, context)
         
         stream = await self.client.chat.completions.create(
-            model=self.model_name,
+            model=self.resolve_model_name(model_name),
             messages=messages,
-            temperature=temperature,
-            max_tokens=4096,
+            # temperature=temperature,
+            # max_tokens=4096,
             stream=True
         )
         
@@ -83,7 +93,10 @@ class LLMService:
             doc_title = ""
             excerpt_text = ""
             section_title = ""
-            source_filename = metadata.get('Source_Filename', metadata.get('source_filename', ''))
+            source_filename = metadata.get(
+                'Source_Filename',
+                metadata.get('source_filename', chunk.get('Source_Filename', chunk.get('source_filename', '')))
+            )
             
             # Normalize page metadata: supports scalar values and lists (e.g. [1, 2]).
             page_val = metadata.get('page_number', metadata.get('page'))
@@ -92,10 +105,10 @@ class LLMService:
             page_info = self._format_page_info(page_val)
 
             # --- 2. Handle Decisions vs Standard Docs ---
-            if raw_source_type == 'Decisions' or 'تفصيل_القرار' in metadata:
+            if raw_source_type == 'Decisions' or 'تفصيل_القرار' in metadata or 'تفصيل_القرار' in chunk:
                 # Decision Logic
-                decision_details = metadata.get('تفصيل_القرار', {})
-                decision_id = decision_details.get('رقم_القرار_النهائي', metadata.get('Source_Filename', 'Unknown'))
+                decision_details = self._normalize_decision_details(metadata, chunk)
+                decision_id = self._extract_decision_id(decision_details, metadata, chunk)
                 
                 doc_title = f"قرار رقم: {decision_id}"
                 canonical_decision_key = source_filename or str(decision_id)
@@ -204,6 +217,59 @@ class LLMService:
 
         text = str(page_value).strip()
         return text if text else None
+
+    def _normalize_decision_details(self, metadata: Dict[str, Any], chunk: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Returns decision details as a dict even when the payload is stored as JSON string.
+        """
+        raw_details = metadata.get('تفصيل_القرار')
+        if raw_details is None:
+            raw_details = chunk.get('تفصيل_القرار')
+
+        if isinstance(raw_details, dict):
+            return raw_details
+
+        if isinstance(raw_details, str):
+            text = raw_details.strip()
+            if not text:
+                return {}
+            try:
+                parsed = json.loads(text)
+                return parsed if isinstance(parsed, dict) else {}
+            except json.JSONDecodeError:
+                return {}
+
+        return {}
+
+    def _extract_decision_id(
+        self,
+        decision_details: Dict[str, Any],
+        metadata: Dict[str, Any],
+        chunk: Dict[str, Any]
+    ) -> str:
+        """
+        Extracts the best available decision number from multiple expected locations.
+        """
+        candidates = [
+            decision_details.get('رقم_القرار_النهائي'),
+            metadata.get('رقم_القرار_النهائي'),
+            chunk.get('رقم_القرار_النهائي'),
+            metadata.get('decision_id'),
+            chunk.get('decision_id'),
+            metadata.get('Source_Filename'),
+            metadata.get('source_filename'),
+            chunk.get('Source_Filename'),
+            chunk.get('source_filename'),
+        ]
+
+        for value in candidates:
+            if value is None:
+                continue
+            text = str(value).strip()
+            if text:
+                return text
+
+        return "Unknown"
     
     def _create_messages(self, question: str, context: str) -> List[Dict[str, str]]:
         """
@@ -223,7 +289,13 @@ class LLMService:
     - **رقم الصفحة**: إذا كان "رقم الصفحة" متوفراً في المصدر، اذكره **داخل سطر الشرح نفسه** وليس في قسم منفصل (مثال: `... وفقاً للنص (رقم الصفحة: 6)` أو `... (رقم الصفحة: 5، 6)`).
     - إذا كان رقم الصفحة غير متوفر، لا تذكر الصفحة نهائياً.
 
-4. **تنسيق الإجابة (Markdown)**:
+4. **ترتيب المصادر إلزامي**:
+    - اعرض المصادر بنفس ترتيب ظهورها في "المصادر المتاحة" (الملف رقم 1 ثم 2 ثم 3...).
+    - لكل مصدر: اكتب الإجابة/الشرح الخاص به مباشرة تحته قبل الانتقال للمصدر التالي.
+    - لا تخلط شرح مصدر مع مصدر آخر.
+    - لا تبدأ بالمصدر الثاني قبل إكمال الأول.
+
+5. **تنسيق الإجابة (Markdown)**:
 
    # [عنوان الإجابة]
    
@@ -236,7 +308,7 @@ class LLMService:
    
    ## 📚 التفاصيل من المصادر
    
-   ### 1. [اسم الملف]
+    ### المصدر الأول: [اسم الملف]
    **النوع:** [نوع الملف]
    
    #### 📄 المحتوى ذو الصلة:
@@ -245,8 +317,17 @@ class LLMService:
    
    ---
    
-   ### 2. [اسم الملف الثاني...]
-   ...
+    ### المصدر الثاني: [اسم الملف الثاني]
+    **النوع:** [نوع الملف]
+
+    #### 📄 المحتوى ذو الصلة:
+     ##### 🧩 [عنوان الفقرة (Chunk Title)]
+     [شرح المحتوى بشكل مباشر، مع إدراج رقم الصفحة داخل سطر الشرح إذا كان متوفراً]
+
+    ---
+
+    ### المصدر الثالث: [...]
+    ... بنفس النمط
    
    ---
    
