@@ -4,7 +4,6 @@ Embedding endpoints
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorCollection
-import tiktoken
 from pymongo.errors import BulkWriteError # Import this to handle duplicates
 
 from app.models.schemas import GuidelineDocument, DecisionDocument, EmbedResponse
@@ -13,22 +12,17 @@ from app.services.vector_store import VectorStoreService
 
 router = APIRouter(prefix="/embed", tags=["Embedding"])
 
-MAX_TOKEN_LIMIT = 8000 
 
-def truncate_text_to_tokens(text: str, max_tokens: int = MAX_TOKEN_LIMIT) -> str:
-    if not text:
-        return ""
-    try:
-        encoding = tiktoken.get_encoding("cl100k_base")
-        tokens = encoding.encode(text)
-        if len(tokens) > max_tokens:
-            return encoding.decode(tokens[:max_tokens])
-        return text
-    except Exception:
-        char_limit = max_tokens * 2 
-        if len(text) > char_limit:
-            return text[:char_limit]
-        return text
+async def _process_document(
+    doc: Dict[str, Any],
+    vector_service: VectorStoreService
+) -> List[Dict[str, Any]]:
+    if 'تفصيل_القرار' in doc:
+        decision = DecisionDocument(**doc)
+        return await vector_service.process_decision(decision)
+
+    guideline = GuidelineDocument(**doc)
+    return await vector_service.process_guideline(guideline)
 
 @router.post("", response_model=EmbedResponse)
 async def embed_documents(
@@ -40,30 +34,16 @@ async def embed_documents(
         all_chunks = []
         
         for doc in documents:
-            # 1. Truncate Text to prevent OpenAI 400 Errors
-            if 'تفصيل_القرار' in doc and isinstance(doc['تفصيل_القرار'], str):
-                doc['تفصيل_القرار'] = truncate_text_to_tokens(doc['تفصيل_القرار'])
+            chunks = await _process_document(doc, vector_service)
             
-            for key in ['text', 'content', 'description']:
-                if key in doc and isinstance(doc[key], str):
-                    doc[key] = truncate_text_to_tokens(doc[key])
-
-            # 2. Process Vectors
-            if 'تفصيل_القرار' in doc:
-                decision = DecisionDocument(**doc)
-                chunks = await vector_service.process_decision(decision)
-            else:
-                guideline = GuidelineDocument(**doc)
-                chunks = await vector_service.process_guideline(guideline)
-            
-            # 3. Ensure embedding_text exists
+            # Ensure embedding_text exists
             for chunk in chunks:
                 if 'embedding_text' not in chunk:
                      chunk['embedding_text'] = chunk.get('text', '')
             
             all_chunks.extend(chunks)
         
-        # 4. Insert into MongoDB with Duplicate Handling
+        # Insert into MongoDB with duplicate handling.
         inserted_count = 0
         duplicates_count = 0
         

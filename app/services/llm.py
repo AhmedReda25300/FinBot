@@ -2,6 +2,7 @@ from openai import AsyncOpenAI
 from typing import List, Dict, Any, AsyncIterator
 from app.config import get_settings
 import json
+import google.generativeai as genai
 
 settings = get_settings()
 
@@ -10,15 +11,19 @@ client = None
 if settings.OPENAI_API_KEY:
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
+# Configure Google Generative AI
+if settings.GOOGLE_API_KEY:
+    genai.configure(api_key=settings.GOOGLE_API_KEY)
+
 class LLMService:
     """Service for generating answers using OpenAI's GPT-4 model"""
     
     def __init__(self):
-        if not settings.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
+        if not settings.OPENAI_API_KEY and not settings.GOOGLE_API_KEY:
+            raise ValueError("Neither OPENAI_API_KEY nor GOOGLE_API_KEY found in environment variables")
         self.client = client
         self.model_name = settings.LLM_MODEL
-        self.allowed_models = {"gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini"}
+        self.allowed_models = {"gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini", "gemini-2.5-flash"}
 
     def resolve_model_name(self, model_name: str = None) -> str:
         """Return a safe model name, falling back to configured default when invalid/missing."""
@@ -27,7 +32,7 @@ class LLMService:
             return candidate
         return self.model_name
     
-    def generate_answer(
+    async def generate_answer(
         self, 
         question: str, 
         context_chunks: List[Dict[str, Any]],
@@ -36,14 +41,11 @@ class LLMService:
     ) -> str:
         context = self._build_context(context_chunks)
         messages = self._create_messages(question, context)
-        
-        response = self.client.chat.completions.create(
-            model=self.resolve_model_name(model_name),
+        return await self.generate_answer_from_messages(
             messages=messages,
-            # temperature=temperature,
-            # max_tokens=4096,
+            temperature=temperature,
+            model_name=model_name,
         )
-        return response.choices[0].message.content
 
     async def generate_answer_stream(
         self, 
@@ -54,18 +56,105 @@ class LLMService:
     ) -> AsyncIterator[str]:
         context = self._build_context(context_chunks)
         messages = self._create_messages(question, context)
-        
-        stream = await self.client.chat.completions.create(
-            model=self.resolve_model_name(model_name),
+        async for chunk in self.generate_answer_stream_from_messages(
             messages=messages,
-            # temperature=temperature,
-            # max_tokens=4096,
-            stream=True
+            temperature=temperature,
+            model_name=model_name,
+        ):
+            yield chunk
+
+    async def generate_answer_from_messages(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        model_name: str = None,
+        max_tokens: int = 4096,
+    ) -> str:
+        resolved_model = self.resolve_model_name(model_name)
+        self._ensure_provider_available(resolved_model)
+
+        if self._is_gemini_model(resolved_model):
+            prompt = self._messages_to_gemini_prompt(messages)
+            model = genai.GenerativeModel(resolved_model)
+            response = model.generate_content(
+                prompt,
+                generation_config={"temperature": temperature, "max_output_tokens": max_tokens},
+            )
+            text = getattr(response, "text", None)
+            return text or ""
+
+        response = await self.client.chat.completions.create(
+            model=resolved_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
-        
+        return response.choices[0].message.content or ""
+
+    async def generate_answer_stream_from_messages(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        model_name: str = None,
+        max_tokens: int = 4096,
+    ) -> AsyncIterator[str]:
+        resolved_model = self.resolve_model_name(model_name)
+        self._ensure_provider_available(resolved_model)
+
+        if self._is_gemini_model(resolved_model):
+            prompt = self._messages_to_gemini_prompt(messages)
+            model = genai.GenerativeModel(resolved_model)
+            stream = model.generate_content(
+                prompt,
+                generation_config={"temperature": temperature, "max_output_tokens": max_tokens},
+                stream=True,
+            )
+            for chunk in stream:
+                text = getattr(chunk, "text", None)
+                if text:
+                    yield text
+            return
+
+        stream = await self.client.chat.completions.create(
+            model=resolved_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True,
+        )
+
         async for chunk in stream:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
+
+    def _is_gemini_model(self, model_name: str) -> bool:
+        return str(model_name).strip().startswith("gemini-")
+
+    def _ensure_provider_available(self, model_name: str) -> None:
+        if self._is_gemini_model(model_name):
+            if not settings.GOOGLE_API_KEY:
+                raise ValueError("GOOGLE_API_KEY is required to use Gemini models")
+            return
+
+        if self.client is None:
+            raise ValueError("OPENAI_API_KEY is required to use OpenAI GPT models")
+
+    def _messages_to_gemini_prompt(self, messages: List[Dict[str, str]]) -> str:
+        prompt_parts = []
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+            if not content:
+                continue
+
+            if role == "system":
+                prompt_parts.append(f"[System Instructions]\n{content}")
+            elif role == "assistant":
+                prompt_parts.append(f"[Assistant]\n{content}")
+            else:
+                prompt_parts.append(f"[User]\n{content}")
+
+        return "\n\n".join(prompt_parts)
     
     def _build_context(self, chunks: List[Dict[str, Any]]) -> str:
         """

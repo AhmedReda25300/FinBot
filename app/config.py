@@ -25,14 +25,16 @@ class Settings(BaseSettings):
     # Google AI Settings
     GOOGLE_API_KEY: str = os.getenv('GOOGLE_API_KEY', '')
     OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
-    EMBEDDING_MODEL: str = "text-embedding-3-large"
-    # EMBEDDING_MODEL: str = "models/gemini-embedding-001"
-    # LLM_MODEL: str = "gemini-2.5-flash"
-    LLM_MODEL: str = "gpt-4.1"
+    TAVILY_API_KEY: str = os.getenv('TAVILY_API_KEY', '')
+    # EMBEDDING_MODEL: str = "text-embedding-3-large"
+    EMBEDDING_MODEL: str = "models/gemini-embedding-001"
+    LLM_MODEL: str = "gemini-2.5-flash"
+    # LLM_MODEL: str = "gpt-4.1"
+
 
     
     # Text Processing Settings
-    MAX_TOKENS: int = 2048
+    MAX_TOKENS: int = 4096
     OVERLAP_RATIO: float = 0.1
     
     # Search Settings

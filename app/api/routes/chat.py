@@ -9,10 +9,49 @@ from app.models.schemas import ChatRequest, ChatResponse
 from app.api.dependencies import get_db_collection, get_embedding_service, get_llm_service
 from app.services.embedding import EmbeddingService
 from app.services.llm import LLMService
+from app.services.web_search import web_search_service
 from app.utils.similarity import cosine_similarity
 import json
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+
+
+async def _get_doc_context_from_db(
+    collection: AsyncIOMotorCollection,
+    mongo_filter: dict,
+) -> tuple[list[str], list[str], list[str]]:
+    """
+    Fetches distinct document titles, source types, and categories from MongoDB
+    using the same filter applied for retrieval. Used to give the web search
+    service rich domain context when generating a search query.
+    """
+    pipeline = [
+        {"$match": mongo_filter},
+        {
+            "$group": {
+                "_id": None,
+                "titles": {
+                    "$addToSet": {
+                        "$ifNull": [
+                            "$metadata.document_title",
+                            "$metadata.source_filename",
+                        ]
+                    }
+                },
+                "source_types": {"$addToSet": "$metadata.source_type"},
+                "categories": {"$addToSet": "$metadata.category"},
+            }
+        },
+    ]
+    results = await collection.aggregate(pipeline).to_list(length=1)
+    if not results:
+        return [], [], []
+
+    row = results[0]
+    titles = [t for t in row.get("titles", []) if t]
+    source_types = [s for s in row.get("source_types", []) if s]
+    categories = [c for c in row.get("categories", []) if c]
+    return titles, source_types, categories
 
 
 @router.post("/ask", response_model=ChatResponse)
@@ -32,13 +71,7 @@ async def ask_question(
         ChatResponse with answer and source documents
     """
     try:
-        # Get query embedding
-        query_embedding = embedding_svc.get_embedding(
-            request.question, 
-            task_type="retrieval_query"
-        )
-        
-        # Build MongoDB filter
+        # Build MongoDB filter first (needed for both web search and retrieval)
         mongo_filter = {}
         if request.category:
             mongo_filter['metadata.category'] = request.category
@@ -47,6 +80,30 @@ async def ask_question(
                 mongo_filter['metadata.source_type'] = {'$in': request.source_type}
             else:
                 mongo_filter['metadata.source_type'] = request.source_type
+
+        # ── Web search enrichment layer ──────────────────────────────────────
+        # When enabled, collect DB context then search the internet to create a
+        # richer retrieval query (2-3 sentence summary) used instead of the raw
+        # user question for vector similarity search.
+        retrieval_query = request.question
+        if request.use_web_search and web_search_service.is_available:
+            titles, source_types, categories = await _get_doc_context_from_db(
+                collection, mongo_filter
+            )
+            retrieval_query = await web_search_service.enrich_query(
+                user_question=request.question,
+                doc_titles=titles,
+                source_types=source_types,
+                categories=categories,
+            )
+        # ─────────────────────────────────────────────────────────────────────
+
+        # Get query embedding (uses enriched query when web search is on)
+        print(f"[/ask] Embedding query ({'web-enriched' if request.use_web_search else 'original'}): {retrieval_query}")
+        query_embedding = embedding_svc.get_embedding(
+            retrieval_query,
+            task_type="retrieval_query"
+        )
         
         # Retrieve all matching documents
         cursor = collection.find(mongo_filter)
@@ -89,7 +146,7 @@ async def ask_question(
             )
         else:
             # Use default prompt
-            answer = llm_svc.generate_answer(
+            answer = await llm_svc.generate_answer(
                 question=request.question,
                 context_chunks=top_chunks,
                 temperature=request.temperature,
@@ -134,13 +191,7 @@ async def ask_question_stream(
     """
     print("Received chat request:", request)
     try:
-        # Get query embedding
-        query_embedding = embedding_svc.get_embedding(
-            request.question, 
-            task_type="retrieval_query"
-        )
-        
-        # Build MongoDB filter
+        # Build MongoDB filter first (needed for both web search and retrieval)
         mongo_filter = {}
         if request.category:
             mongo_filter['metadata.category'] = request.category
@@ -149,6 +200,27 @@ async def ask_question_stream(
                 mongo_filter['metadata.source_type'] = {'$in': request.source_type}
             else:
                 mongo_filter['metadata.source_type'] = request.source_type
+
+        # ── Web search enrichment layer ──────────────────────────────────────
+        retrieval_query = request.question
+        if request.use_web_search and web_search_service.is_available:
+            titles, source_types, categories = await _get_doc_context_from_db(
+                collection, mongo_filter
+            )
+            retrieval_query = await web_search_service.enrich_query(
+                user_question=request.question,
+                doc_titles=titles,
+                source_types=source_types,
+                categories=categories,
+            )
+        # ─────────────────────────────────────────────────────────────────────
+
+        # Get query embedding (uses enriched query when web search is on)
+        print(f"[/ask_stream] Embedding query ({'web-enriched' if request.use_web_search else 'original'}): {retrieval_query}")
+        query_embedding = embedding_svc.get_embedding(
+            retrieval_query,
+            task_type="retrieval_query"
+        )
         
         # Retrieve all matching documents
         cursor = collection.find(mongo_filter)
@@ -296,15 +368,12 @@ async def _generate_with_custom_prompt(
         }
     ]
     
-    # Generate response
-    response = await llm_svc.client.chat.completions.create(
-        model=llm_svc.resolve_model_name(model_name),
+    return await llm_svc.generate_answer_from_messages(
         messages=messages,
         temperature=temperature,
+        model_name=model_name,
         max_tokens=4096,
     )
-    
-    return response.choices[0].message.content
 
 
 async def _generate_stream_with_custom_prompt(
@@ -340,15 +409,10 @@ async def _generate_stream_with_custom_prompt(
         }
     ]
     
-    # Generate streaming response
-    stream = await llm_svc.client.chat.completions.create(
-        model=llm_svc.resolve_model_name(model_name),
+    async for chunk in llm_svc.generate_answer_stream_from_messages(
         messages=messages,
         temperature=temperature,
+        model_name=model_name,
         max_tokens=4096,
-        stream=True
-    )
-    
-    async for chunk in stream:
-        if chunk.choices[0].delta.content is not None:
-            yield chunk.choices[0].delta.content
+    ):
+        yield chunk

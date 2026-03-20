@@ -35,17 +35,17 @@ class EmbeddingService:
         Returns:
             Embedding vector as numpy array
         """
-        # result = genai.embed_content(
-        #     model=self.model,
-        #     content=text,
-        #     task_type=task_type
-        # )
-        result = client.embeddings.create(
-            input=text,
-            model=self.model
+        result = genai.embed_content(
+            model=self.model,
+            content=text,
+            task_type=task_type
         )
-        embedding = result.data[0].embedding
-        # embedding = result['embedding']
+        # result = client.embeddings.create(
+        #     input=text,
+        #     model=self.model
+        # )
+        # embedding = result.data[0].embedding
+        embedding = result['embedding']
         return np.array(embedding, dtype=np.float32)
     
     def get_embeddings_batch(self, texts: List[str], task_type: str = "retrieval_document") -> np.ndarray:

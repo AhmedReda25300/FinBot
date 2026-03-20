@@ -17,6 +17,9 @@ tiktoken
 numpy==1.26.3
 python-dotenv==1.0.0
 
+# Web Search
+tavily-python
+
 # Optional: Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1

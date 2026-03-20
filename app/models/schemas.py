@@ -47,13 +47,14 @@ class ChatRequest(BaseModel):
     source_type: Optional[Union[str, List[str]]] = Field(
         None, description="Filter by source type (string or list of strings)"
     )
-    num_chunks: int = Field(default=5, ge=1, le=20, description="Number of chunks to retrieve")
+    num_chunks: int = Field(default=10, ge=1, le=40, description="Number of chunks to retrieve")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="LLM temperature")
-    model_name: Literal["gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini"] = Field(
+    model_name: Literal["gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini", "gemini-2.5-flash"] = Field(
         default="gpt-4.1",
         description="LLM model to use"
     )
     custom_system_prompt: Optional[str] = Field(None, description="Custom system prompt for LLM")
+    use_web_search: bool = Field(default=False, description="Enrich retrieval query with a live internet search before RAG")
 
 
 class ChatResponse(BaseModel):
